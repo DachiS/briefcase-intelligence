@@ -4,6 +4,8 @@ import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { deleteS3Object } from '@/lib/s3'
 
+export const dynamic = 'force-dynamic'
+
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -21,20 +23,16 @@ export async function DELETE(
       return NextResponse.json({ error: 'Issue not found' }, { status: 404 })
     }
 
-    // Delete PDF from S3
     if (issue.pdfKey) {
       await deleteS3Object(issue.pdfKey)
     }
 
-    // Delete cover image from S3
     if (issue.coverImage && issue.coverImage.includes('amazonaws.com')) {
       const coverKey = issue.coverImage.split('.amazonaws.com/')[1]
       if (coverKey) await deleteS3Object(coverKey)
     }
 
-    // Delete from database
     await prisma.issue.delete({ where: { id } })
-
     return NextResponse.json({ message: 'Issue deleted successfully' })
   } catch (error) {
     console.error('Delete issue error:', error)

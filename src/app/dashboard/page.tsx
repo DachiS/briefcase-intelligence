@@ -42,6 +42,7 @@ export default function DashboardPage() {
             email: session.user.email || '',
             role: (session.user as any).role || 'SUBSCRIBER',
             hasSubscription: (session.user as any).hasSubscription || false,
+            subscription: null,
           })
           setLoading(false)
         } else if (status === 'unauthenticated') {
@@ -58,7 +59,6 @@ export default function DashboardPage() {
     setCanceling(true)
     const res = await fetch('/api/paddle/cancel', { method: 'POST' })
     if (res.ok) {
-      // Refresh user data
       const data = await fetch('/api/auth/me').then((r) => r.json())
       setUser(data.user)
     }

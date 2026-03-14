@@ -60,7 +60,9 @@ export async function POST(req: NextRequest) {
         data: {
           stripeSubscriptionId: payment_id || order_id,
           stripePriceId: plan,
+          plan: plan === 'annual' ? 'ANNUAL' : 'MONTHLY',
           status: 'ACTIVE',
+          currentPeriodStart: new Date(),
           currentPeriodEnd: endsAt,
         },
       })
@@ -70,7 +72,9 @@ export async function POST(req: NextRequest) {
           userId,
           stripeSubscriptionId: payment_id || order_id,
           stripePriceId: plan,
+          plan: plan === 'annual' ? 'ANNUAL' : 'MONTHLY',
           status: 'ACTIVE',
+          currentPeriodStart: new Date(),
           currentPeriodEnd: endsAt,
         },
       })

@@ -49,28 +49,37 @@ export async function POST(req: NextRequest) {
       endsAt.setMonth(endsAt.getMonth() + 1)
     }
 
-    // Upsert subscription
-    await prisma.subscription.upsert({
+    // Find existing subscription or create new one
+    const existing = await prisma.subscription.findFirst({
       where: { userId },
-      create: {
-        userId,
-        stripeSubscriptionId: payment_id || order_id,
-        stripePriceId: plan,
-        status: 'ACTIVE',
-        currentPeriodEnd: endsAt,
-      },
-      update: {
-        stripeSubscriptionId: payment_id || order_id,
-        stripePriceId: plan,
-        status: 'ACTIVE',
-        currentPeriodEnd: endsAt,
-      },
     })
+
+    if (existing) {
+      await prisma.subscription.update({
+        where: { id: existing.id },
+        data: {
+          stripeSubscriptionId: payment_id || order_id,
+          stripePriceId: plan,
+          status: 'ACTIVE',
+          currentPeriodEnd: endsAt,
+        },
+      })
+    } else {
+      await prisma.subscription.create({
+        data: {
+          userId,
+          stripeSubscriptionId: payment_id || order_id,
+          stripePriceId: plan,
+          status: 'ACTIVE',
+          currentPeriodEnd: endsAt,
+        },
+      })
+    }
 
     console.log(`Subscription activated for user ${userId}, plan: ${plan}`)
     return new NextResponse('OK')
   } catch (error) {
     console.error('Flitt webhook error:', error)
-    return new NextResponse('OK') // Always return OK to Flitt
+    return new NextResponse('OK')
   }
 }

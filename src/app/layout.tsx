@@ -40,7 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         style={{ background: '#0d1117', color: '#e8e6e1' }}
       >
         <NextAuthProvider>{children}</NextAuthProvider>
-        <GoogleAnalytics gaId="G-1VFMEJC1TB" />
+        <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID || "G-1VFMEJC1TB"} />
       </body>
     </html>
   )

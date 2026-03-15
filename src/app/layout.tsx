@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { Barlow_Condensed, Barlow, Share_Tech_Mono } from 'next/font/google'
 import './globals.css'
 import NextAuthProvider from '@/components/SessionProvider'
+import { GoogleAnalytics } from '@next/third-parties/google'
 
 const barlowCondensed = Barlow_Condensed({
   subsets: ['latin'],
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         style={{ background: '#0d1117', color: '#e8e6e1' }}
       >
         <NextAuthProvider>{children}</NextAuthProvider>
+        <GoogleAnalytics gaId="G-1VFMEJC1TB" />
       </body>
     </html>
   )

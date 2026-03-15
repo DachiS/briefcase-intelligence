@@ -1,6 +1,12 @@
 // src/app/api/admin/upload-url/route.ts
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
+export const dynamic = 'force-dynamic'
+
 import { getCurrentUser } from '@/lib/auth'
+export const dynamic = 'force-dynamic'
+
 import { getUploadPresignedUrl, generateIssueKey, generateCoverKey } from '@/lib/s3'
 
 export async function POST(req: NextRequest) {

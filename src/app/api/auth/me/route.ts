@@ -1,5 +1,9 @@
 // src/app/api/auth/me/route.ts
+export const dynamic = 'force-dynamic'
+
 import { NextResponse } from 'next/server'
+export const dynamic = 'force-dynamic'
+
 import { getCurrentUser } from '@/lib/auth'
 
 export async function GET() {

@@ -1,7 +1,15 @@
 // src/app/api/issues/[id]/read/route.ts
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
+export const dynamic = 'force-dynamic'
+
 import { prisma } from '@/lib/prisma'
+export const dynamic = 'force-dynamic'
+
 import { getCurrentUser } from '@/lib/auth'
+export const dynamic = 'force-dynamic'
+
 import { getPDFReadUrl } from '@/lib/s3'
 
 export async function GET(

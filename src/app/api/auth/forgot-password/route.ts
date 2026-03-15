@@ -1,7 +1,15 @@
 // src/app/api/auth/forgot-password/route.ts
+export const dynamic = 'force-dynamic'
+
 import { NextRequest, NextResponse } from 'next/server'
+export const dynamic = 'force-dynamic'
+
 import { prisma } from '@/lib/prisma'
+export const dynamic = 'force-dynamic'
+
 import { sendPasswordResetEmail } from '@/lib/email'
+export const dynamic = 'force-dynamic'
+
 import crypto from 'crypto'
 
 export async function POST(req: NextRequest) {

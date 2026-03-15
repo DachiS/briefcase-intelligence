@@ -1,17 +1,13 @@
-// src/app/api/auth/register/route.ts
 export const dynamic = 'force-dynamic'
+// src/app/api/auth/register/route.ts
 
 import { NextRequest, NextResponse } from 'next/server'
-export const dynamic = 'force-dynamic'
 
 import bcrypt from 'bcryptjs'
-export const dynamic = 'force-dynamic'
 
 import { prisma } from '@/lib/prisma'
-export const dynamic = 'force-dynamic'
 
 import { sendVerificationEmail } from '@/lib/email'
-export const dynamic = 'force-dynamic'
 
 import crypto from 'crypto'
 

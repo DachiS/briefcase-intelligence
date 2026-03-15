@@ -1,10 +1,10 @@
+export const dynamic = 'force-dynamic'
 // src/app/api/admin/issues/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { deleteS3Object } from '@/lib/s3'
 
-export const dynamic = 'force-dynamic'
 
 export async function DELETE(
   req: NextRequest,

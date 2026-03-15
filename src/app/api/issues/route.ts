@@ -1,11 +1,9 @@
-// src/app/api/issues/route.ts
 export const dynamic = 'force-dynamic'
+// src/app/api/issues/route.ts
 
 import { NextResponse } from 'next/server'
-export const dynamic = 'force-dynamic'
 
 import { prisma } from '@/lib/prisma'
-export const dynamic = 'force-dynamic'
 
 import { getCurrentUser } from '@/lib/auth'
 

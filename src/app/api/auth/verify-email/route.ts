@@ -1,8 +1,7 @@
-// src/app/api/auth/verify-email/route.ts
 export const dynamic = 'force-dynamic'
+// src/app/api/auth/verify-email/route.ts
 
 import { NextRequest, NextResponse } from 'next/server'
-export const dynamic = 'force-dynamic'
 
 import { prisma } from '@/lib/prisma'
 

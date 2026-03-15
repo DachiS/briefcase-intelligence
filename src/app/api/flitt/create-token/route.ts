@@ -1,14 +1,11 @@
-// src/app/api/flitt/create-token/route.ts
 export const dynamic = 'force-dynamic'
+// src/app/api/flitt/create-token/route.ts
 
 import { NextRequest, NextResponse } from 'next/server'
-export const dynamic = 'force-dynamic'
 
 import { createFlittToken } from '@/lib/flitt'
-export const dynamic = 'force-dynamic'
 
 import { prisma } from '@/lib/prisma'
-export const dynamic = 'force-dynamic'
 
 import { getCurrentUser } from '@/lib/auth'
 

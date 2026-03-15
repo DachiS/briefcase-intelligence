@@ -1,11 +1,9 @@
-// src/app/api/flitt/webhook/route.ts
 export const dynamic = 'force-dynamic'
+// src/app/api/flitt/webhook/route.ts
 
 import { NextRequest, NextResponse } from 'next/server'
-export const dynamic = 'force-dynamic'
 
 import { verifyCallbackSignature } from '@/lib/flitt'
-export const dynamic = 'force-dynamic'
 
 import { prisma } from '@/lib/prisma'
 

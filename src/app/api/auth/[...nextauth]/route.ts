@@ -1,11 +1,9 @@
-// src/app/api/auth/[...nextauth]/route.ts
 export const dynamic = 'force-dynamic'
+// src/app/api/auth/[...nextauth]/route.ts
 
 import NextAuth from 'next-auth'
-export const dynamic = 'force-dynamic'
 
 import GoogleProvider from 'next-auth/providers/google'
-export const dynamic = 'force-dynamic'
 
 import { prisma } from '@/lib/prisma'
 

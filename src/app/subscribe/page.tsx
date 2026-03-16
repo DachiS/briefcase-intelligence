@@ -10,8 +10,6 @@ const PLANS = {
   annual:  { label: 'Station Chief', price: '$99.99', period: 'per year', desc: 'Full access + 2 months free, billed annually', amount: 9999 },
 }
 
-const MERCHANT_ID = 1549901
-
 function SubscribePage() {
   const [selected, setSelected] = useState<'monthly' | 'annual'>('monthly')
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -47,7 +45,6 @@ function SubscribePage() {
       .finally(() => setLoading(false))
   }, [status, session])
 
-  // Pre-load Flitt SDK on mount
   useEffect(() => {
     if (sdkRef.current) return
     sdkRef.current = true
@@ -64,24 +61,14 @@ function SubscribePage() {
     }
     setCheckoutLoading(true)
     setError('')
-
     try {
-      // Wait for $checkout global (max 5s)
       let attempts = 0
       while (!(window as any).$checkout && attempts < 50) {
         await new Promise(r => setTimeout(r, 100))
         attempts++
       }
       if (!(window as any).$checkout) throw new Error('Payment SDK failed to load — please refresh and try again')
-
       setCheckoutLoading(false)
-
-      const plan = PLANS[selected]
-      const orderId = `order_${userId}_${Date.now()}`
-      const baseUrl = window.location.origin
-
-      // Correct embedded checkout — pass params directly (no server token needed)
-      // Use redirect checkout — most reliable with test credentials
       const googleEmail = session?.user?.email || null
       const res = await fetch('/api/flitt/create-token', {
         method: 'POST',
@@ -90,8 +77,6 @@ function SubscribePage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to initialise payment')
-
-      // Submit form via POST to Flitt hosted checkout page
       const form = document.createElement('form')
       form.method = 'POST'
       form.action = 'https://pay.flitt.com/api/checkout/redirect/'
@@ -102,7 +87,6 @@ function SubscribePage() {
       form.appendChild(input)
       document.body.appendChild(form)
       form.submit()
-
     } catch (err: any) {
       console.error('Checkout error:', err)
       setError(err.message || 'Failed to load payment form')
@@ -114,38 +98,39 @@ function SubscribePage() {
   return (
     <main style={{ minHeight: '100vh' }}>
       <Navbar />
-      <div style={{ maxWidth: '760px', margin: '0 auto', padding: '80px 24px' }}>
+      <div style={{ maxWidth: '760px', margin: '0 auto', padding: 'clamp(48px, 8vw, 80px) 20px' }}>
 
-        <div style={{ textAlign: 'center', marginBottom: '64px' }}>
+        <div style={{ textAlign: 'center', marginBottom: 'clamp(40px, 8vw, 64px)' }}>
           <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.3em', color: 'var(--paper-dim)', textTransform: 'uppercase', marginBottom: '12px' }}>Clearance Granted</p>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '3.5rem', marginBottom: '16px' }}>Choose Your Access Level</h1>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 8vw, 3.5rem)', marginBottom: '16px' }}>Choose Your Access Level</h1>
           <p style={{ fontFamily: 'var(--font-body)', color: 'var(--paper-dim)', fontSize: '1rem' }}>Unlock exclusive intelligence. Cancel anytime.</p>
         </div>
 
         {!showCheckout && (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '40px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '32px' }}>
               {(Object.entries(PLANS) as [keyof typeof PLANS, typeof PLANS[keyof typeof PLANS]][]).map(([key, plan]) => (
                 <button key={key} onClick={() => setSelected(key)} style={{
                   background: selected === key ? 'var(--bg-light)' : 'var(--bg-card)',
                   border: selected === key ? '1px solid var(--red)' : '1px solid var(--border)',
-                  padding: '28px 24px', textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s', position: 'relative',
+                  padding: 'clamp(20px, 4vw, 28px) clamp(16px, 4vw, 24px)',
+                  textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s', position: 'relative',
                 }}>
                   {key === 'annual' && (
                     <div style={{ position: 'absolute', top: '-1px', right: '-1px', background: 'var(--red)', padding: '3px 10px', fontFamily: 'var(--font-mono)', fontSize: '0.5rem', letterSpacing: '0.2em' }}>BEST VALUE</div>
                   )}
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.55rem', letterSpacing: '0.25em', color: 'var(--red)', marginBottom: '8px', textTransform: 'uppercase' }}>{plan.label}</div>
-                  <div style={{ fontFamily: 'var(--font-display)', fontSize: '2.2rem', color: 'var(--paper)', marginBottom: '4px' }}>{plan.price}</div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 5vw, 2.2rem)', color: 'var(--paper)', marginBottom: '4px' }}>{plan.price}</div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--paper-dim)', marginBottom: '12px' }}>{plan.period}</div>
                   <div style={{ fontFamily: 'var(--font-body)', fontSize: '0.8rem', color: 'var(--paper-dim)' }}>{plan.desc}</div>
                 </button>
               ))}
             </div>
 
-            <div style={{ border: '1px solid var(--border)', padding: '24px', marginBottom: '40px' }}>
+            <div style={{ border: '1px solid var(--border)', padding: 'clamp(16px, 4vw, 24px)', marginBottom: '32px' }}>
               {['Access to all published issues', 'New intelligence briefings monthly', 'Exclusive operative analyses', 'Cancel anytime, no questions asked'].map((item, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 0', borderBottom: i < 3 ? '1px solid var(--border)' : 'none' }}>
-                  <div style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: '0.7rem' }}>◆</div>
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderBottom: i < 3 ? '1px solid var(--border)' : 'none' }}>
+                  <div style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: '0.7rem', flexShrink: 0 }}>◆</div>
                   <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.9rem', color: 'var(--paper-dim)' }}>{item}</span>
                 </div>
               ))}

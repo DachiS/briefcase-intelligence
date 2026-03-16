@@ -25,7 +25,6 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [canceling, setCanceling] = useState(false)
   const router = useRouter()
-
   const { data: session, status } = useSession()
 
   useEffect(() => {
@@ -53,9 +52,7 @@ export default function DashboardPage() {
   }, [router, session, status])
 
   const handleCancel = async () => {
-    if (!confirm('Cancel your subscription? You keep access until the end of the billing period.'))
-      return
-
+    if (!confirm('Cancel your subscription? You keep access until the end of the billing period.')) return
     setCanceling(true)
     const res = await fetch('/api/paddle/cancel', { method: 'POST' })
     if (res.ok) {
@@ -67,12 +64,10 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen flex flex-col">
+      <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         <Navbar />
-        <div className="flex-1 flex items-center justify-center">
-          <p className="font-mono text-xs text-paper/30 tracking-widest animate-pulse">
-            AUTHENTICATING...
-          </p>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--paper-dim)', letterSpacing: '0.2em' }}>AUTHENTICATING...</p>
         </div>
       </main>
     )
@@ -83,33 +78,36 @@ export default function DashboardPage() {
   const sub = user.subscription
 
   return (
-    <main className="min-h-screen flex flex-col">
+    <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Navbar />
+      <div style={{ flex: 1, padding: 'clamp(48px, 8vw, 96px) 20px' }}>
+        <div style={{ maxWidth: '640px', margin: '0 auto' }}>
 
-      <div className="flex-1 px-6 py-24">
-        <div className="max-w-2xl mx-auto">
-          <p className="font-mono text-xs tracking-widest text-paper/30 uppercase mb-4">
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.3em', color: 'var(--paper-dim)', textTransform: 'uppercase', marginBottom: '12px' }}>
             Operative File
           </p>
-          <h1 className="font-display text-5xl mb-16">Welcome, {user.name.split(' ')[0]}</h1>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.5rem, 8vw, 3.5rem)', marginBottom: 'clamp(40px, 8vw, 64px)' }}>
+            Welcome, {user.name.split(' ')[0]}
+          </h1>
 
           {/* Account Info */}
-          <div className="card p-8 mb-6">
-            <h2 className="font-mono text-xs tracking-widest text-paper/30 uppercase mb-6">
+          <div className="card" style={{ padding: 'clamp(20px, 5vw, 32px)', marginBottom: '16px' }}>
+            <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.3em', color: 'var(--paper-dim)', textTransform: 'uppercase', marginBottom: '24px' }}>
               Account Details
             </h2>
-            <div className="space-y-4">
-              <div className="flex justify-between border-b border-paper/5 pb-4">
-                <span className="font-body text-paper/50 text-sm">Name</span>
-                <span className="font-body text-sm">{user.name}</span>
-              </div>
-              <div className="flex justify-between border-b border-paper/5 pb-4">
-                <span className="font-body text-paper/50 text-sm">Email</span>
-                <span className="font-body text-sm">{user.email}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-body text-paper/50 text-sm">Access Level</span>
-                <span className="font-mono text-xs text-gold-light">
+            <div>
+              {[
+                { label: 'Name', value: user.name },
+                { label: 'Email', value: user.email },
+              ].map(({ label, value }) => (
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(232,230,225,0.05)', paddingBottom: '16px', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+                  <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.85rem', color: 'var(--paper-dim)' }}>{label}</span>
+                  <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.85rem', wordBreak: 'break-all' }}>{value}</span>
+                </div>
+              ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.85rem', color: 'var(--paper-dim)' }}>Access Level</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: '#c8a96e', letterSpacing: '0.1em' }}>
                   {user.role === 'ADMIN' ? 'Director' : user.hasSubscription ? 'Field Agent' : 'Civilian'}
                 </span>
               </div>
@@ -117,49 +115,31 @@ export default function DashboardPage() {
           </div>
 
           {/* Subscription Info */}
-          <div className="card p-8 mb-6">
-            <h2 className="font-mono text-xs tracking-widest text-paper/30 uppercase mb-6">
+          <div className="card" style={{ padding: 'clamp(20px, 5vw, 32px)', marginBottom: '24px' }}>
+            <h2 style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.3em', color: 'var(--paper-dim)', textTransform: 'uppercase', marginBottom: '24px' }}>
               Subscription Status
             </h2>
 
             {sub ? (
-              <div className="space-y-4">
-                <div className="flex justify-between border-b border-paper/5 pb-4">
-                  <span className="font-body text-paper/50 text-sm">Plan</span>
-                  <span className="font-body text-sm capitalize">{sub.plan.toLowerCase()}</span>
-                </div>
-                <div className="flex justify-between border-b border-paper/5 pb-4">
-                  <span className="font-body text-paper/50 text-sm">Status</span>
-                  <span
-                    className={`font-mono text-xs ${
-                      sub.status === 'ACTIVE' ? 'text-green-400' : 'text-red-spy'
-                    }`}
-                  >
-                    {sub.status}
-                  </span>
-                </div>
-                <div className="flex justify-between border-b border-paper/5 pb-4">
-                  <span className="font-body text-paper/50 text-sm">Renews / Expires</span>
-                  <span className="font-body text-sm">
-                    {new Date(sub.currentPeriodEnd).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })}
-                  </span>
-                </div>
+              <div>
+                {[
+                  { label: 'Plan', value: sub.plan.toLowerCase(), capitalize: true },
+                  { label: 'Status', value: sub.status, mono: true, green: sub.status === 'ACTIVE' },
+                  { label: 'Renews / Expires', value: new Date(sub.currentPeriodEnd).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) },
+                ].map(({ label, value, capitalize, mono, green }) => (
+                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(232,230,225,0.05)', paddingBottom: '16px', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+                    <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.85rem', color: 'var(--paper-dim)' }}>{label}</span>
+                    <span style={{ fontFamily: mono ? 'var(--font-mono)' : 'var(--font-body)', fontSize: mono ? '0.65rem' : '0.85rem', textTransform: capitalize ? 'capitalize' : 'none', color: green !== undefined ? (green ? '#4ade80' : 'var(--red)') : 'inherit' }}>{value}</span>
+                  </div>
+                ))}
                 {sub.cancelAtPeriodEnd && (
-                  <p className="font-mono text-xs text-red-spy/70">
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--red)', opacity: 0.7, marginTop: '8px' }}>
                     Cancels at period end. You keep access until the date above.
                   </p>
                 )}
                 {!sub.cancelAtPeriodEnd && (
-                  <div className="pt-2">
-                    <button
-                      onClick={handleCancel}
-                      disabled={canceling}
-                      className="font-mono text-xs text-paper/30 hover:text-red-spy transition-colors"
-                    >
+                  <div style={{ paddingTop: '8px' }}>
+                    <button onClick={handleCancel} disabled={canceling} style={{ background: 'none', border: 'none', fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--paper-dim)', cursor: 'pointer', letterSpacing: '0.1em' }}>
                       {canceling ? 'Processing...' : 'Cancel subscription'}
                     </button>
                   </div>
@@ -167,20 +147,15 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div>
-                <p className="font-body text-paper/50 mb-6">You don&apos;t have an active subscription.</p>
-                <Link href="/subscribe" className="btn-primary">
-                  Subscribe Now
-                </Link>
+                <p style={{ fontFamily: 'var(--font-body)', color: 'var(--paper-dim)', marginBottom: '24px', fontSize: '0.9rem' }}>You don&apos;t have an active subscription.</p>
+                <Link href="/subscribe" className="btn-primary">Subscribe Now</Link>
               </div>
             )}
           </div>
 
-          {/* Quick Links */}
           {user.hasSubscription && (
-            <div className="text-center">
-              <Link href="/issues" className="btn-primary">
-                Browse All Issues →
-              </Link>
+            <div style={{ textAlign: 'center' }}>
+              <Link href="/issues" className="btn-primary">Browse All Issues →</Link>
             </div>
           )}
         </div>

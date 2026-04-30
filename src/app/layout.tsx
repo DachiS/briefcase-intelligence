@@ -1,6 +1,6 @@
 // src/app/layout.tsx
 import type { Metadata } from 'next'
-import { Barlow_Condensed, Barlow, Share_Tech_Mono } from 'next/font/google'
+import { Barlow_Condensed, Barlow, Share_Tech_Mono, Crimson_Text } from 'next/font/google'
 import './globals.css'
 import NextAuthProvider from '@/components/SessionProvider'
 import { GoogleAnalytics } from '@next/third-parties/google'
@@ -26,6 +26,14 @@ const shareTechMono = Share_Tech_Mono({
   display: 'swap',
 })
 
+const crimsonText = Crimson_Text({
+  subsets: ['latin'],
+  variable: '--font-serif',
+  weight: ['400', '600'],
+  style: ['normal', 'italic'],
+  display: 'swap',
+})
+
 export const metadata: Metadata = {
   title: 'Briefcase Intelligence — Exclusive Intelligence Insights',
   description:
@@ -36,8 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body
-        className={`${barlowCondensed.variable} ${barlow.variable} ${shareTechMono.variable} antialiased`}
-        style={{ background: '#0d1117', color: '#e8e6e1' }}
+        className={`${barlowCondensed.variable} ${barlow.variable} ${shareTechMono.variable} ${crimsonText.variable} antialiased`}
       >
         <NextAuthProvider>{children}</NextAuthProvider>
         <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID || "G-1VFMEJC1TB"} />

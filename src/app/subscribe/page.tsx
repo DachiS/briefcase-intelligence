@@ -1,19 +1,12 @@
-// src/app/subscribe/page.tsx
 'use client'
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Navbar from '@/components/Navbar'
 
-const PLANS = {
-  monthly: { label: 'Field Agent', price: '$19.99', period: 'per month', desc: 'Full access to all issues, monthly billing', amount: 1999 },
-  annual:  { label: 'Station Chief', price: '$99.99', period: 'per year', desc: 'Full access + 2 months free, billed annually', amount: 9999 },
-}
-
 function SubscribePage() {
   const [selected, setSelected] = useState<'monthly' | 'annual'>('monthly')
   const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [userId, setUserId] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [error, setError] = useState('')
@@ -32,16 +25,11 @@ function SubscribePage() {
     fetch('/api/auth/me')
       .then(r => r.json())
       .then(d => {
-        if (d.user) { setIsLoggedIn(true); setUserId(d.user.id) }
-        else if (status === 'authenticated' && session?.user) {
-          setIsLoggedIn(true)
-          setUserId((session.user as any).id || '')
-        } else if (status !== 'loading') setIsLoggedIn(false)
+        if (d.user) setIsLoggedIn(true)
+        else if (status === 'authenticated' && session?.user) setIsLoggedIn(true)
+        else if (status !== 'loading') setIsLoggedIn(false)
       })
-      .catch(() => {
-        if (status === 'authenticated') setIsLoggedIn(true)
-        else setIsLoggedIn(false)
-      })
+      .catch(() => { if (status === 'authenticated') setIsLoggedIn(true); else setIsLoggedIn(false) })
       .finally(() => setLoading(false))
   }, [status, session])
 
@@ -55,110 +43,181 @@ function SubscribePage() {
   }, [])
 
   const handleCheckout = async () => {
-    if (!isLoggedIn) {
-      router.push(`/login?redirect=/subscribe?plan=${selected}`)
-      return
-    }
-    setCheckoutLoading(true)
-    setError('')
+    if (!isLoggedIn) { router.push(`/login?redirect=/subscribe?plan=${selected}`); return }
+    setCheckoutLoading(true); setError('')
     try {
       let attempts = 0
-      while (!(window as any).$checkout && attempts < 50) {
-        await new Promise(r => setTimeout(r, 100))
-        attempts++
-      }
+      while (!(window as any).$checkout && attempts < 50) { await new Promise(r => setTimeout(r, 100)); attempts++ }
       if (!(window as any).$checkout) throw new Error('Payment SDK failed to load — please refresh and try again')
       setCheckoutLoading(false)
       const googleEmail = session?.user?.email || null
-      const res = await fetch('/api/flitt/create-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: selected, googleEmail }),
-      })
+      const res = await fetch('/api/flitt/create-token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan: selected, googleEmail }) })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to initialise payment')
       const form = document.createElement('form')
-      form.method = 'POST'
-      form.action = 'https://pay.flitt.com/api/checkout/redirect/'
+      form.method = 'POST'; form.action = 'https://pay.flitt.com/api/checkout/redirect/'
       const input = document.createElement('input')
-      input.type = 'hidden'
-      input.name = 'token'
-      input.value = data.token
-      form.appendChild(input)
-      document.body.appendChild(form)
-      form.submit()
+      input.type = 'hidden'; input.name = 'token'; input.value = data.token
+      form.appendChild(input); document.body.appendChild(form); form.submit()
     } catch (err: any) {
-      console.error('Checkout error:', err)
       setError(err.message || 'Failed to load payment form')
-      setShowCheckout(false)
-      setCheckoutLoading(false)
+      setShowCheckout(false); setCheckoutLoading(false)
     }
   }
 
   return (
     <main style={{ minHeight: '100vh' }}>
       <Navbar />
-      <div style={{ maxWidth: '760px', margin: '0 auto', padding: 'clamp(48px, 8vw, 80px) 20px' }}>
 
-        <div style={{ textAlign: 'center', marginBottom: 'clamp(40px, 8vw, 64px)' }}>
-          <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.3em', color: 'var(--paper-dim)', textTransform: 'uppercase', marginBottom: '12px' }}>Clearance Granted</p>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 8vw, 3.5rem)', marginBottom: '16px' }}>Choose Your Access Level</h1>
-          <p style={{ fontFamily: 'var(--font-body)', color: 'var(--paper-dim)', fontSize: '1rem' }}>Unlock exclusive intelligence. Cancel anytime.</p>
+      {/* Header */}
+      <section className="bg-radial-noir" style={{ padding: 'clamp(48px, 8vw, 72px) 24px 56px', textAlign: 'center' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+          <span style={{ width: 28, height: 1, background: 'var(--red)' }} />
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', letterSpacing: '0.4em', color: 'var(--red)' }}>// CLEARANCE</span>
+          <span style={{ width: 28, height: 1, background: 'var(--red)' }} />
         </div>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.2rem, 8vw, 4rem)', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase', lineHeight: 0.92, margin: 0, marginBottom: 16 }}>Choose Your Tier</h1>
+        <p style={{ fontFamily: 'var(--font-serif)', fontSize: 'clamp(1rem, 2.5vw, 1.2rem)', color: 'var(--paper-2)', maxWidth: 480, margin: '0 auto 10px', fontStyle: 'italic' }}>
+          "Information is the most valuable currency."
+        </p>
+        <p style={{ fontFamily: 'var(--font-body)', fontSize: '0.88rem', color: 'var(--paper-dim)', maxWidth: 460, margin: '0 auto' }}>
+          Each issue arrives sealed, declassified, and delivered to your secure terminal. Cancel any time, no questions logged.
+        </p>
+      </section>
 
-        {!showCheckout && (
-          <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '32px' }}>
-              {(Object.entries(PLANS) as [keyof typeof PLANS, typeof PLANS[keyof typeof PLANS]][]).map(([key, plan]) => (
-                <button key={key} onClick={() => setSelected(key)} style={{
-                  background: selected === key ? 'var(--bg-light)' : 'var(--bg-card)',
-                  border: selected === key ? '1px solid var(--red)' : '1px solid var(--border)',
-                  padding: 'clamp(20px, 4vw, 28px) clamp(16px, 4vw, 24px)',
-                  textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s', position: 'relative',
-                }}>
-                  {key === 'annual' && (
-                    <div style={{ position: 'absolute', top: '-1px', right: '-1px', background: 'var(--red)', padding: '3px 10px', fontFamily: 'var(--font-mono)', fontSize: '0.5rem', letterSpacing: '0.2em' }}>BEST VALUE</div>
-                  )}
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.55rem', letterSpacing: '0.25em', color: 'var(--red)', marginBottom: '8px', textTransform: 'uppercase' }}>{plan.label}</div>
-                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 5vw, 2.2rem)', color: 'var(--paper)', marginBottom: '4px' }}>{plan.price}</div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--paper-dim)', marginBottom: '12px' }}>{plan.period}</div>
-                  <div style={{ fontFamily: 'var(--font-body)', fontSize: '0.8rem', color: 'var(--paper-dim)' }}>{plan.desc}</div>
-                </button>
-              ))}
-            </div>
-
-            <div style={{ border: '1px solid var(--border)', padding: 'clamp(16px, 4vw, 24px)', marginBottom: '32px' }}>
-              {['Access to all published issues', 'New intelligence briefings monthly', 'Exclusive operative analyses', 'Cancel anytime, no questions asked'].map((item, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderBottom: i < 3 ? '1px solid var(--border)' : 'none' }}>
-                  <div style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: '0.7rem', flexShrink: 0 }}>◆</div>
-                  <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.9rem', color: 'var(--paper-dim)' }}>{item}</span>
+      {!showCheckout && (
+        <div style={{ maxWidth: '1080px', margin: '0 auto', padding: 'clamp(32px, 6vw, 56px) clamp(16px, 4vw, 40px)' }}>
+          {/* Tier cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 24, marginBottom: 48 }}>
+            {/* Analyst (free) */}
+            <div style={{ position: 'relative' }}>
+              <div className="card-base" style={{ padding: 28, position: 'relative', overflow: 'hidden' }}>
+                <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 52, opacity: 0.15 }} preserveAspectRatio="none" viewBox="0 0 100 30">
+                  <polygon points="0,0 50,28 100,0" fill="none" stroke="var(--paper-mute)" strokeWidth="0.8" />
+                </svg>
+                <div style={{ position: 'absolute', top: 22, right: 18, transform: 'rotate(-6deg)' }}>
+                  <div className="stamp-round" style={{ width: 58, height: 58, fontSize: '0.42rem', color: 'var(--paper-dim)', opacity: 0.85 }}>
+                    <div>ANA</div><div>LYST</div>
+                  </div>
                 </div>
-              ))}
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.32em', color: 'var(--paper-dim)', marginBottom: 10 }}>TIER · 00</div>
+                <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6 }}>ANALYST</h3>
+                <p style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem', color: 'var(--paper-dim)', marginBottom: 22, lineHeight: 1.5 }}>Free tier. Sample one declassified issue per quarter.</p>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 22 }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '1rem', color: 'var(--paper-dim)' }}>$</span>
+                  <span style={{ fontFamily: 'var(--font-display)', fontSize: '3rem', fontWeight: 800, color: 'var(--paper)', lineHeight: 0.9 }}>0</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--paper-dim)', letterSpacing: '0.2em' }}>/ forever</span>
+                </div>
+                <div style={{ height: 1, background: 'repeating-linear-gradient(90deg, var(--paper-mute) 0 4px, transparent 4px 8px)', marginBottom: 18 }} />
+                {[{ label: '1 sample issue per quarter' }, { label: 'Read in browser only' }, { label: 'Public archive index' }, { label: 'PDF download', locked: true }, { label: 'Full archive access', locked: true }].map((f, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 10 }}>
+                    <span style={{ color: f.locked ? 'var(--paper-mute)' : 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: '0.7rem', paddingTop: 2 }}>{f.locked ? '×' : '◆'}</span>
+                    <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem', color: f.locked ? 'var(--paper-mute)' : 'var(--paper-2)', textDecoration: f.locked ? 'line-through' : 'none' }}>{f.label}</span>
+                  </div>
+                ))}
+                <div style={{ marginTop: 24 }}>
+                  <a href="/register" className="btn-outline" style={{ display: 'block', textAlign: 'center' }}>Create Account</a>
+                </div>
+              </div>
             </div>
 
-            {error && (
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--red)', border: '1px solid var(--border-red)', padding: '12px 16px', marginBottom: '24px' }}>⚠ {error}</div>
-            )}
+            {/* Field Agent */}
+            <div style={{ position: 'relative', paddingTop: 24 }}>
+              <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', zIndex: 2 }}>
+                <span className="stamp red">MOST RECRUITED</span>
+              </div>
+              <div className="card-base red-edge" style={{ padding: 28, paddingTop: 36, position: 'relative', overflow: 'hidden', background: 'linear-gradient(180deg, #1a0a0a 0%, var(--bg-card) 100%)' }}>
+                <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 52, opacity: 0.18 }} preserveAspectRatio="none" viewBox="0 0 100 30">
+                  <polygon points="0,0 50,28 100,0" fill="none" stroke="var(--red)" strokeWidth="0.8" />
+                </svg>
+                <div style={{ position: 'absolute', top: 22, right: 18, transform: 'rotate(-6deg)' }}>
+                  <div className="stamp-round" style={{ width: 58, height: 58, fontSize: '0.42rem', color: 'var(--red)', opacity: 0.85 }}>
+                    <div>FIELD</div><div>AGT</div>
+                  </div>
+                </div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.32em', color: 'var(--red)', marginBottom: 10 }}>TIER · 01</div>
+                <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6 }}>FIELD AGENT</h3>
+                <p style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem', color: 'var(--paper-dim)', marginBottom: 22, lineHeight: 1.5 }}>Full active access. New issue every month, on the day it drops.</p>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 22 }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '1rem', color: 'var(--paper-dim)' }}>$</span>
+                  <span style={{ fontFamily: 'var(--font-display)', fontSize: '3rem', fontWeight: 800, color: 'var(--paper)', lineHeight: 0.9 }}>19.99</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--paper-dim)', letterSpacing: '0.2em' }}>/ month</span>
+                </div>
+                <div style={{ height: 1, background: 'repeating-linear-gradient(90deg, var(--paper-mute) 0 4px, transparent 4px 8px)', marginBottom: 18 }} />
+                {[{ label: 'New issue every month' }, { label: 'Full archive · 12 months' }, { label: 'PDF download · offline reading' }, { label: 'Encrypted reader' }, { label: 'Cancel anytime' }].map((f, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 10 }}>
+                    <span style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: '0.7rem', paddingTop: 2 }}>◆</span>
+                    <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem', color: 'var(--paper-2)' }}>{f.label}</span>
+                  </div>
+                ))}
+                <div style={{ marginTop: 24 }}>
+                  <button onClick={() => { setSelected('monthly'); handleCheckout() }} disabled={loading || checkoutLoading} className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
+                    {loading ? 'LOADING...' : checkoutLoading ? 'INITIALIZING...' : !isLoggedIn ? 'LOGIN TO SUBSCRIBE' : 'Receive Brief — $19.99/mo'}
+                  </button>
+                </div>
+              </div>
+            </div>
 
-            <button onClick={handleCheckout} disabled={loading || checkoutLoading} className="btn-primary" style={{ width: '100%', fontSize: '0.85rem', padding: '16px' }}>
-              {loading ? 'LOADING...' : checkoutLoading ? 'INITIALIZING...' : !isLoggedIn ? 'LOGIN TO SUBSCRIBE' : `SUBSCRIBE — ${PLANS[selected].price}`}
-            </button>
-            <p style={{ textAlign: 'center', marginTop: '16px', fontFamily: 'var(--font-mono)', fontSize: '0.55rem', color: 'var(--paper-dim)', letterSpacing: '0.1em' }}>SECURED BY FLITT · VISA · MASTERCARD</p>
-          </>
-        )}
-
-        {showCheckout && (
-          <div>
-            {checkoutLoading && (
-              <div style={{ textAlign: 'center', padding: '60px', fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--paper-dim)', letterSpacing: '0.2em' }}>INITIALIZING SECURE PAYMENT...</div>
-            )}
-            <div id="flitt-checkout-container" style={{ minHeight: '400px', width: '100%' }} />
-            <button onClick={() => { setShowCheckout(false); setError('') }} style={{ marginTop: '20px', background: 'none', border: 'none', fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--paper-dim)', cursor: 'pointer', letterSpacing: '0.2em' }}>
-              ← BACK TO PLANS
-            </button>
+            {/* Station Chief */}
+            <div style={{ position: 'relative' }}>
+              <div className="card-base" style={{ padding: 28, position: 'relative', overflow: 'hidden' }}>
+                <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 52, opacity: 0.15 }} preserveAspectRatio="none" viewBox="0 0 100 30">
+                  <polygon points="0,0 50,28 100,0" fill="none" stroke="var(--gold)" strokeWidth="0.8" />
+                </svg>
+                <div style={{ position: 'absolute', top: 22, right: 18, transform: 'rotate(-6deg)' }}>
+                  <div className="stamp-round" style={{ width: 58, height: 58, fontSize: '0.42rem', color: 'var(--gold)', opacity: 0.85 }}>
+                    <div>STN</div><div>CHIEF</div>
+                  </div>
+                </div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.32em', color: 'var(--paper-dim)', marginBottom: 10 }}>TIER · 02</div>
+                <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6 }}>STATION CHIEF</h3>
+                <p style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem', color: 'var(--paper-dim)', marginBottom: 22, lineHeight: 1.5 }}>Lifetime archive. All declassified issues, plus locked Chief-only briefs.</p>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 22 }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '1rem', color: 'var(--paper-dim)' }}>$</span>
+                  <span style={{ fontFamily: 'var(--font-display)', fontSize: '3rem', fontWeight: 800, color: 'var(--paper)', lineHeight: 0.9 }}>99.99</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--paper-dim)', letterSpacing: '0.2em' }}>/ year</span>
+                </div>
+                <div style={{ height: 1, background: 'repeating-linear-gradient(90deg, var(--paper-mute) 0 4px, transparent 4px 8px)', marginBottom: 18 }} />
+                {[{ label: 'Everything in Field Agent' }, { label: 'Complete archive · all issues' }, { label: 'Chief-only locked briefs' }, { label: 'Priority intelligence inbox' }, { label: 'Save 25% vs monthly · 2 mo free' }].map((f, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 10 }}>
+                    <span style={{ color: 'var(--gold)', fontFamily: 'var(--font-mono)', fontSize: '0.7rem', paddingTop: 2 }}>◆</span>
+                    <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem', color: 'var(--paper-2)' }}>{f.label}</span>
+                  </div>
+                ))}
+                <div style={{ marginTop: 24 }}>
+                  <button onClick={() => { setSelected('annual'); handleCheckout() }} disabled={loading || checkoutLoading} className="btn-outline" style={{ width: '100%', justifyContent: 'center' }}>
+                    {loading ? 'LOADING...' : checkoutLoading ? 'INITIALIZING...' : !isLoggedIn ? 'LOGIN TO SUBSCRIBE' : 'Select Tier — $99.99/yr'}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-        )}
-      </div>
+
+          {error && (
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--red)', border: '1px solid var(--border-red)', padding: '12px 16px', marginBottom: 24, letterSpacing: '0.08em' }}>⚠ {error}</div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 16, padding: '12px 24px', border: '1px dashed var(--paper-mute)', fontFamily: 'var(--font-mono)', fontSize: '0.55rem', letterSpacing: '0.24em', color: 'var(--paper-dim)' }}>
+              <span style={{ color: 'var(--green)' }}>● SECURE</span>
+              <span>SECURED BY FLITT · VISA · MASTERCARD</span>
+              <span style={{ color: 'var(--gold)' }}>◆ NO LOG</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCheckout && (
+        <div style={{ maxWidth: '760px', margin: '0 auto', padding: '40px 20px' }}>
+          {checkoutLoading && (
+            <div style={{ textAlign: 'center', padding: '60px', fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--paper-dim)', letterSpacing: '0.2em' }}>INITIALIZING SECURE PAYMENT...</div>
+          )}
+          <div id="flitt-checkout-container" style={{ minHeight: '400px', width: '100%' }} />
+          <button onClick={() => { setShowCheckout(false); setError('') }} style={{ marginTop: '20px', background: 'none', border: 'none', fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--paper-dim)', cursor: 'pointer', letterSpacing: '0.2em' }}>
+            ← BACK TO PLANS
+          </button>
+        </div>
+      )}
     </main>
   )
 }

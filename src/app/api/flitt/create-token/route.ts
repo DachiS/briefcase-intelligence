@@ -5,8 +5,8 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
  
 const PLANS = {
-  monthly: { amount: 19.99, label: 'Field Agent Monthly' },
-  annual:  { amount: 99.99, label: 'Station Chief Annual' },
+  monthly: { amount: 1999, label: 'Field Agent Monthly' },   // $19.99 in cents
+  annual:  { amount: 9999, label: 'Station Chief Annual' },  // $99.99 in cents
 }
  
 export const dynamic = 'force-dynamic'
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
  
     const tokenParams: Record<string, string | number> = {
       order_id: orderId,
-      amount: selectedPlan.amount,
+      amount: selectedPlan.amount,  // integer cents
       currency,
       order_desc: `Briefcase Intelligence ${selectedPlan.label}`,
       response_url: isLocalhost ? 'https://pay.flitt.com' : `${baseUrl}/dashboard?subscribed=true`,

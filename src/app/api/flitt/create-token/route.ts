@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
 
     const tokenParams: Record<string, string | number> = {
       order_id: orderId,
-      amount: String(selectedPlan.amount),
+      amount: selectedPlan.amount,
       currency,
       order_desc: `Briefcase Intelligence ${selectedPlan.label}`,
       response_url: responseUrl,

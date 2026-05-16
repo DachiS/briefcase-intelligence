@@ -20,12 +20,19 @@ export function generateSignature(params: Record<string, string | number>): stri
 }
  
 export async function createFlittToken(params: Record<string, string | number>): Promise<{ token: string; payment_id?: string }> {
+  // Build request with all required fields explicitly
   const requestParams: Record<string, string | number> = {
     merchant_id: FLITT_MERCHANT_ID,
-    ...params,
-    // Ensure amount is always a plain integer
+    order_id: params.order_id,
     amount: Math.round(Number(params.amount)),
+    currency: params.currency,
+    order_desc: params.order_desc,
+    response_url: params.response_url,
   }
+ 
+  // Add optional params
+  if (params.server_callback_url) requestParams.server_callback_url = params.server_callback_url
+  if (params.merchant_data) requestParams.merchant_data = params.merchant_data
  
   const signature = generateSignature(requestParams)
   const body = { request: { ...requestParams, signature } }

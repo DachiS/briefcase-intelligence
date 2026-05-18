@@ -1,11 +1,16 @@
 // src/middleware.ts
 import { NextRequest, NextResponse } from 'next/server'
 
-const ACCESS_CODE = process.env.SITE_ACCESS_CODE || 'briefcase'
+const ACCESS_CODE = process.env.SITE_ACCESS_CODE
 const COOKIE_NAME = 'site_access'
 const PUBLIC_PATHS = ['/api/site-access', '/_next', '/favicon.ico']
 
 export function middleware(req: NextRequest) {
+  // If no access code is set, allow everyone through
+  if (!ACCESS_CODE) {
+    return NextResponse.next()
+  }
+
   const { pathname } = req.nextUrl
 
   // Allow public paths through

@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { Barlow_Condensed, Barlow, Share_Tech_Mono, Crimson_Text } from 'next/font/google'
 import './globals.css'
 import NextAuthProvider from '@/components/SessionProvider'
+import Footer from '@/components/Footer'
 import { GoogleAnalytics } from '@next/third-parties/google'
 
 const barlowCondensed = Barlow_Condensed({
@@ -45,8 +46,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body
         className={`${barlowCondensed.variable} ${barlow.variable} ${shareTechMono.variable} ${crimsonText.variable} antialiased`}
+        style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}
       >
-        <NextAuthProvider>{children}</NextAuthProvider>
+        <NextAuthProvider>
+          {children}
+          <Footer />
+        </NextAuthProvider>
         <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID || "G-1VFMEJC1TB"} />
       </body>
     </html>

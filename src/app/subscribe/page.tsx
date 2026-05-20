@@ -204,6 +204,13 @@ function SubscribePage() {
               <span style={{ color: 'var(--gold)' }}>◆ NO LOG</span>
             </div>
           </div>
+
+          <p style={{ textAlign: 'center', fontFamily: 'var(--font-body)', fontSize: '0.75rem', color: 'var(--paper-dim)', lineHeight: 1.6, marginTop: '20px' }}>
+            By subscribing you agree to our{' '}
+            <a href="/terms" style={{ color: 'var(--paper)', textDecoration: 'underline' }}>Terms of Service</a>
+            {' '}and{' '}
+            <a href="/refund" style={{ color: 'var(--paper)', textDecoration: 'underline' }}>Refund Policy</a>.
+          </p>
         </div>
       )}
 

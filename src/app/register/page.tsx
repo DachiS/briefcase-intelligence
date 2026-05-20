@@ -100,6 +100,13 @@ export default function RegisterPage() {
             <button type="submit" className="btn-primary" disabled={loading} style={{ marginTop: '8px' }}>
               {loading ? 'Creating account...' : 'Create Account'}
             </button>
+
+            <p style={{ fontFamily: 'var(--font-body)', fontSize: '0.75rem', color: 'var(--paper-dim)', lineHeight: 1.6, textAlign: 'center', marginTop: '16px' }}>
+              By creating an account you agree to our{' '}
+              <Link href="/terms" style={{ color: 'var(--paper)', textDecoration: 'underline' }}>Terms of Service</Link>
+              {' '}and{' '}
+              <Link href="/privacy" style={{ color: 'var(--paper)', textDecoration: 'underline' }}>Privacy Policy</Link>.
+            </p>
           </form>
 
           <p style={{ marginTop: '32px', fontFamily: 'var(--font-body)', color: 'var(--paper-dim)', fontSize: '0.85rem', textAlign: 'center' }}>

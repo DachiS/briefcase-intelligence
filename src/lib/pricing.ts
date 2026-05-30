@@ -7,8 +7,8 @@
 //
 // Canonical amounts resolved per Task 1 rule (a): the Paddle price config in
 // `src/lib/paddle.ts` carries live Paddle price IDs (pri_…) at 9.99 / 89.99,
-// corroborated by the homepage. (The decommissioned Flitt handler's 19.99 /
-// 99.99 were stale and have been removed.)
+// corroborated by the homepage. (The previous processor's stale 19.99 / 99.99
+// amounts have been removed.)
 
 export type Interval = 'free' | 'month' | 'year'
 

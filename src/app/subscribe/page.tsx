@@ -1,69 +1,73 @@
 'use client'
 import { useState, useEffect, useRef, Suspense } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Navbar from '@/components/Navbar'
 import { PRICING, fmt, amountStr } from '@/lib/pricing'
 
 function SubscribePage() {
-  const [selected, setSelected] = useState<'monthly' | 'annual'>('monthly')
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [loading, setLoading] = useState(true)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [error, setError] = useState('')
-  const [showCheckout, setShowCheckout] = useState(false)
+  const [email, setEmail] = useState('')
   const sdkRef = useRef(false)
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { data: session, status } = useSession()
-
-  useEffect(() => {
-    const planParam = searchParams.get('plan')
-    if (planParam === 'annual') setSelected('annual')
-  }, [searchParams])
 
   useEffect(() => {
     fetch('/api/auth/me')
       .then(r => r.json())
       .then(d => {
-        if (d.user) setIsLoggedIn(true)
-        else if (status === 'authenticated' && session?.user) setIsLoggedIn(true)
+        if (d.user) { setIsLoggedIn(true); setEmail(d.user.email || '') }
+        else if (status === 'authenticated' && session?.user) { setIsLoggedIn(true); setEmail(session.user.email || '') }
         else if (status !== 'loading') setIsLoggedIn(false)
       })
       .catch(() => { if (status === 'authenticated') setIsLoggedIn(true); else setIsLoggedIn(false) })
       .finally(() => setLoading(false))
   }, [status, session])
 
+  // Load Paddle.js. Paddle is our Merchant of Record; checkout activates once
+  // the public client token (NEXT_PUBLIC_PADDLE_CLIENT_TOKEN) is configured.
   useEffect(() => {
     if (sdkRef.current) return
     sdkRef.current = true
+    const token = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN
+    if (!token) return
     const script = document.createElement('script')
-    script.src = 'https://cdn.jsdelivr.net/npm/@flittpayments/js-sdk'
+    script.src = 'https://cdn.paddle.com/paddle/v2/paddle.js'
     script.async = true
+    script.onload = () => {
+      const Paddle = (window as any).Paddle
+      if (!Paddle) return
+      if (process.env.NEXT_PUBLIC_PADDLE_ENV === 'sandbox') Paddle.Environment.set('sandbox')
+      Paddle.Initialize({ token })
+    }
     document.head.appendChild(script)
   }, [])
 
-  const handleCheckout = async () => {
-    if (!isLoggedIn) { router.push(`/login?redirect=/subscribe?plan=${selected}`); return }
-    setCheckoutLoading(true); setError('')
-    try {
-      let attempts = 0
-      while (!(window as any).$checkout && attempts < 50) { await new Promise(r => setTimeout(r, 100)); attempts++ }
-      if (!(window as any).$checkout) throw new Error('Payment SDK failed to load — please refresh and try again')
-      setCheckoutLoading(false)
-      const googleEmail = session?.user?.email || null
-      const res = await fetch('/api/flitt/create-token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan: selected, googleEmail }) })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to initialise payment')
-      const form = document.createElement('form')
-      form.method = 'POST'; form.action = 'https://pay.flitt.com/api/checkout/redirect/'
-      const input = document.createElement('input')
-      input.type = 'hidden'; input.name = 'token'; input.value = data.token
-      form.appendChild(input); document.body.appendChild(form); form.submit()
-    } catch (err: any) {
-      setError(err.message || 'Failed to load payment form')
-      setShowCheckout(false); setCheckoutLoading(false)
+  const handleCheckout = (plan: 'monthly' | 'annual') => {
+    if (!isLoggedIn) { router.push(`/login?redirect=/subscribe?plan=${plan}`); return }
+    setError('')
+    const Paddle = (window as any).Paddle
+    const priceId = plan === 'annual' ? PRICING.stationChief.paddlePriceId : PRICING.fieldAgent.paddlePriceId
+    if (!Paddle || !priceId) {
+      setError('Secure checkout is being finalized. Please try again shortly or contact support@briefcase.agency.')
+      return
     }
+    setCheckoutLoading(true)
+    const buyerEmail = email || session?.user?.email || undefined
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
+    Paddle.Checkout.open({
+      items: [{ priceId, quantity: 1 }],
+      ...(buyerEmail ? { customer: { email: buyerEmail } } : {}),
+      customData: { plan, email: buyerEmail || '' },
+      settings: {
+        displayMode: 'overlay',
+        successUrl: `${baseUrl}/dashboard?subscribed=true&plan=${plan}`,
+      },
+    })
+    setCheckoutLoading(false)
   }
 
   return (
@@ -86,7 +90,6 @@ function SubscribePage() {
         </p>
       </section>
 
-      {!showCheckout && (
         <div style={{ maxWidth: '1080px', margin: '0 auto', padding: 'clamp(32px, 6vw, 56px) clamp(16px, 4vw, 40px)' }}>
           {/* Tier cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 24, marginBottom: 48 }}>
@@ -152,7 +155,7 @@ function SubscribePage() {
                   </div>
                 ))}
                 <div style={{ marginTop: 24 }}>
-                  <button onClick={() => { setSelected('monthly'); handleCheckout() }} disabled={loading || checkoutLoading} className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
+                  <button onClick={() => handleCheckout('monthly')} disabled={loading || checkoutLoading} className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
                     {loading ? 'LOADING...' : checkoutLoading ? 'INITIALIZING...' : !isLoggedIn ? 'LOGIN TO SUBSCRIBE' : `Receive Brief — ${fmt(PRICING.fieldAgent.amount)}/mo`}
                   </button>
                 </div>
@@ -186,7 +189,7 @@ function SubscribePage() {
                   </div>
                 ))}
                 <div style={{ marginTop: 24 }}>
-                  <button onClick={() => { setSelected('annual'); handleCheckout() }} disabled={loading || checkoutLoading} className="btn-outline" style={{ width: '100%', justifyContent: 'center' }}>
+                  <button onClick={() => handleCheckout('annual')} disabled={loading || checkoutLoading} className="btn-outline" style={{ width: '100%', justifyContent: 'center' }}>
                     {loading ? 'LOADING...' : checkoutLoading ? 'INITIALIZING...' : !isLoggedIn ? 'LOGIN TO SUBSCRIBE' : `Select Tier — ${fmt(PRICING.stationChief.amount)}/yr`}
                   </button>
                 </div>
@@ -201,31 +204,22 @@ function SubscribePage() {
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 16, padding: '12px 24px', border: '1px dashed var(--paper-mute)', fontFamily: 'var(--font-mono)', fontSize: '0.55rem', letterSpacing: '0.24em', color: 'var(--paper-dim)' }}>
               <span style={{ color: 'var(--green)' }}>● SECURE</span>
-              <span>SECURED BY FLITT · VISA · MASTERCARD</span>
+              <span>PAYMENTS BY PADDLE · VISA · MASTERCARD</span>
               <span style={{ color: 'var(--gold)' }}>◆ NO LOG</span>
             </div>
           </div>
 
           <p style={{ textAlign: 'center', fontFamily: 'var(--font-body)', fontSize: '0.75rem', color: 'var(--paper-dim)', lineHeight: 1.6, marginTop: '20px' }}>
+            Payments are securely processed by our reseller and Merchant of Record, Paddle.com. By continuing, you agree to Paddle&apos;s Buyer Terms.
+          </p>
+
+          <p style={{ textAlign: 'center', fontFamily: 'var(--font-body)', fontSize: '0.75rem', color: 'var(--paper-dim)', lineHeight: 1.6, marginTop: '12px' }}>
             By subscribing you agree to our{' '}
             <a href="/terms" style={{ color: 'var(--paper)', textDecoration: 'underline' }}>Terms of Service</a>
             {' '}and{' '}
             <a href="/refund" style={{ color: 'var(--paper)', textDecoration: 'underline' }}>Refund Policy</a>.
           </p>
         </div>
-      )}
-
-      {showCheckout && (
-        <div style={{ maxWidth: '760px', margin: '0 auto', padding: '40px 20px' }}>
-          {checkoutLoading && (
-            <div style={{ textAlign: 'center', padding: '60px', fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--paper-dim)', letterSpacing: '0.2em' }}>INITIALIZING SECURE PAYMENT...</div>
-          )}
-          <div id="flitt-checkout-container" style={{ minHeight: '400px', width: '100%' }} />
-          <button onClick={() => { setShowCheckout(false); setError('') }} style={{ marginTop: '20px', background: 'none', border: 'none', fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--paper-dim)', cursor: 'pointer', letterSpacing: '0.2em' }}>
-            ← BACK TO PLANS
-          </button>
-        </div>
-      )}
     </main>
   )
 }

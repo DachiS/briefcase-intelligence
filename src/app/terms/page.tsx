@@ -23,41 +23,46 @@ const sections = [
   },
   {
     id: '04',
+    title: 'Billing, Payments, and Merchant of Record',
+    content: `Our order process and payments are conducted by our online reseller Paddle.com. Paddle.com Market Ltd. (and its affiliates) is the Merchant of Record for all orders placed through Briefcase Intelligence. Paddle provides all customer service inquiries and handles returns.\n\nWhen you purchase a subscription, Paddle — not Briefcase Intelligence — processes your payment, issues your invoice or receipt, and is responsible for collecting and remitting any applicable sales tax or VAT. Your purchase is therefore also subject to Paddle's Checkout Buyer Terms (paddle.com/legal/checkout-buyer-terms) and Privacy Policy (paddle.com/legal/privacy).\n\nSubscriptions renew automatically at the then-current price until cancelled. You can cancel at any time from your account or by contacting support@briefcase.agency. Refunds are governed by our Refund Policy and are processed through Paddle.`
+  },
+  {
+    id: '05',
     title: 'Account Registration',
     content: `To access paid features, you must create an account and provide accurate, complete information. You are responsible for maintaining the confidentiality of your credentials and for all activity under your account. You must be at least 18 years of age to create an account. You agree to notify us immediately of any unauthorized use of your account.`
   },
   {
-    id: '05',
+    id: '06',
     title: 'Cancellation',
     content: `You may cancel your subscription at any time from your account settings. Upon cancellation, your access continues until the end of the current billing period. No partial refunds are issued for unused portions of a billing period. Following cancellation, your account reverts to the Analyst (free) tier.`
   },
   {
-    id: '06',
+    id: '07',
     title: 'Intellectual Property',
     content: `All content published by Briefcase Intelligence — including articles, design, graphics, layouts, and editorial material — is the exclusive property of Briefcase Intelligence and protected by applicable copyright laws. Subscribers are granted a limited, non-transferable, non-exclusive license to access and read content for personal, non-commercial use only. Reproduction, redistribution, or resale of any content is strictly prohibited without prior written consent.`
   },
   {
-    id: '07',
+    id: '08',
     title: 'Prohibited Conduct',
     content: `You agree not to: share account credentials or subscription access with others; scrape, crawl, or systematically download content; reverse-engineer, decompile, or attempt to extract source code; use the Service for any unlawful purpose; impersonate any person or entity; or interfere with the security or integrity of the Service. Violations may result in immediate account termination without refund.`
   },
   {
-    id: '08',
+    id: '09',
     title: 'Limitation of Liability',
     content: `To the fullest extent permitted by law, Briefcase Intelligence shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising from your use of the Service. Our total liability to you for any claim shall not exceed the amount you paid us in the twelve months preceding the claim.`
   },
   {
-    id: '09',
+    id: '10',
     title: 'Modifications to Service',
     content: `We reserve the right to modify, suspend, or discontinue any aspect of the Service at any time. We will provide reasonable notice of material changes where possible. Continued use of the Service after changes constitutes acceptance of the updated terms.`
   },
   {
-    id: '10',
+    id: '11',
     title: 'Governing Law',
     content: `These Terms are governed by and construed in accordance with the laws of Georgia (country). Any disputes arising under these Terms shall be subject to the exclusive jurisdiction of the courts of Georgia.`
   },
   {
-    id: '11',
+    id: '12',
     title: 'Contact',
     content: `For questions regarding these Terms, contact us at:\n\nBriefcase Intelligence\nwww.briefcase.agency\nsupport@briefcase.agency`
   },

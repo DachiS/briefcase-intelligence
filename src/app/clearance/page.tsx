@@ -464,6 +464,9 @@ export default function ClearancePage() {
             <button onClick={() => router.push('/subscribe')} className="btn-primary" style={{ fontSize: '1rem', padding: '16px 48px' }}>
               Claim Your Access →
             </button>
+            <p style={{ fontFamily: 'var(--font-body)', fontSize: '0.72rem', color: 'var(--paper-dim)', lineHeight: 1.6, maxWidth: 440, margin: '20px auto 0' }}>
+              Payments are securely processed by our reseller and Merchant of Record, Paddle.com. By continuing, you agree to Paddle&apos;s Buyer Terms.
+            </p>
           </div>
         )}
 

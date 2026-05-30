@@ -216,7 +216,7 @@ export default function HomePage() {
           <div style={{ marginTop: 48, display: 'flex', justifyContent: 'center' }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 16, padding: '12px 24px', border: '1px dashed var(--paper-mute)', fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.24em', color: 'var(--paper-dim)' }}>
               <span style={{ color: 'var(--green)' }}>● SECURE</span>
-              <span>SECURED BY FLITT · VISA · MASTERCARD</span>
+              <span>PAYMENTS BY PADDLE · VISA · MASTERCARD</span>
               <span style={{ color: 'var(--gold)' }}>◆ NO LOG</span>
             </div>
           </div>

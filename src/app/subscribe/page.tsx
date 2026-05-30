@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Navbar from '@/components/Navbar'
+import { PRICING, fmt, amountStr } from '@/lib/pricing'
 
 function SubscribePage() {
   const [selected, setSelected] = useState<'monthly' | 'annual'>('monthly')
@@ -105,7 +106,7 @@ function SubscribePage() {
                 <p style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem', color: 'var(--paper-dim)', marginBottom: 22, lineHeight: 1.5 }}>Free tier. Sample one declassified issue per quarter.</p>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 22 }}>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: '1rem', color: 'var(--paper-dim)' }}>$</span>
-                  <span style={{ fontFamily: 'var(--font-display)', fontSize: '3rem', fontWeight: 800, color: 'var(--paper)', lineHeight: 0.9 }}>0</span>
+                  <span style={{ fontFamily: 'var(--font-display)', fontSize: '3rem', fontWeight: 800, color: 'var(--paper)', lineHeight: 0.9 }}>{amountStr(PRICING.analyst.amount)}</span>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--paper-dim)', letterSpacing: '0.2em' }}>/ forever</span>
                 </div>
                 <div style={{ height: 1, background: 'repeating-linear-gradient(90deg, var(--paper-mute) 0 4px, transparent 4px 8px)', marginBottom: 18 }} />
@@ -140,7 +141,7 @@ function SubscribePage() {
                 <p style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem', color: 'var(--paper-dim)', marginBottom: 22, lineHeight: 1.5 }}>Full active access. New issue every month, on the day it drops.</p>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 22 }}>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: '1rem', color: 'var(--paper-dim)' }}>$</span>
-                  <span style={{ fontFamily: 'var(--font-display)', fontSize: '3rem', fontWeight: 800, color: 'var(--paper)', lineHeight: 0.9 }}>19.99</span>
+                  <span style={{ fontFamily: 'var(--font-display)', fontSize: '3rem', fontWeight: 800, color: 'var(--paper)', lineHeight: 0.9 }}>{amountStr(PRICING.fieldAgent.amount)}</span>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--paper-dim)', letterSpacing: '0.2em' }}>/ month</span>
                 </div>
                 <div style={{ height: 1, background: 'repeating-linear-gradient(90deg, var(--paper-mute) 0 4px, transparent 4px 8px)', marginBottom: 18 }} />
@@ -152,7 +153,7 @@ function SubscribePage() {
                 ))}
                 <div style={{ marginTop: 24 }}>
                   <button onClick={() => { setSelected('monthly'); handleCheckout() }} disabled={loading || checkoutLoading} className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
-                    {loading ? 'LOADING...' : checkoutLoading ? 'INITIALIZING...' : !isLoggedIn ? 'LOGIN TO SUBSCRIBE' : 'Receive Brief — $19.99/mo'}
+                    {loading ? 'LOADING...' : checkoutLoading ? 'INITIALIZING...' : !isLoggedIn ? 'LOGIN TO SUBSCRIBE' : `Receive Brief — ${fmt(PRICING.fieldAgent.amount)}/mo`}
                   </button>
                 </div>
               </div>
@@ -174,7 +175,7 @@ function SubscribePage() {
                 <p style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem', color: 'var(--paper-dim)', marginBottom: 22, lineHeight: 1.5 }}>Lifetime archive. All declassified issues, plus locked Chief-only briefs.</p>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 22 }}>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: '1rem', color: 'var(--paper-dim)' }}>$</span>
-                  <span style={{ fontFamily: 'var(--font-display)', fontSize: '3rem', fontWeight: 800, color: 'var(--paper)', lineHeight: 0.9 }}>99.99</span>
+                  <span style={{ fontFamily: 'var(--font-display)', fontSize: '3rem', fontWeight: 800, color: 'var(--paper)', lineHeight: 0.9 }}>{amountStr(PRICING.stationChief.amount)}</span>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--paper-dim)', letterSpacing: '0.2em' }}>/ year</span>
                 </div>
                 <div style={{ height: 1, background: 'repeating-linear-gradient(90deg, var(--paper-mute) 0 4px, transparent 4px 8px)', marginBottom: 18 }} />
@@ -186,7 +187,7 @@ function SubscribePage() {
                 ))}
                 <div style={{ marginTop: 24 }}>
                   <button onClick={() => { setSelected('annual'); handleCheckout() }} disabled={loading || checkoutLoading} className="btn-outline" style={{ width: '100%', justifyContent: 'center' }}>
-                    {loading ? 'LOADING...' : checkoutLoading ? 'INITIALIZING...' : !isLoggedIn ? 'LOGIN TO SUBSCRIBE' : 'Select Tier — $99.99/yr'}
+                    {loading ? 'LOADING...' : checkoutLoading ? 'INITIALIZING...' : !isLoggedIn ? 'LOGIN TO SUBSCRIBE' : `Select Tier — ${fmt(PRICING.stationChief.amount)}/yr`}
                   </button>
                 </div>
               </div>

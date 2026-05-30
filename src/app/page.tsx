@@ -2,6 +2,7 @@
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import SpyGlobe from '@/components/SpyGlobe'
+import { PRICING, fmt, amountStr } from '@/lib/pricing'
 
 const articles = [
   { num: '01', category: 'Latest News',            title: 'Missing Russian Businessman',  desc: 'The mysterious disappearance of prominent oligarch Dmitri Volkov raises questions that reach far beyond a missing persons case.' },
@@ -75,7 +76,7 @@ export default function HomePage() {
 
             {/* Trust strip */}
             <div className="anim-fade-up delay-5" style={{ display: 'flex', gap: 'clamp(16px, 4vw, 32px)', marginTop: 40, paddingTop: 24, borderTop: '1px solid var(--border)', flexWrap: 'wrap' }}>
-              {[['12,400+', 'Active operatives'], ['72', 'Declassified ops'], ['$9.99', 'Per month']].map(([n, l]) => (
+              {[['12,400+', 'Active operatives'], ['72', 'Declassified ops'], [fmt(PRICING.fieldAgent.amount), 'Per month']].map(([n, l]) => (
                 <div key={l}>
                   <div style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.4rem, 4vw, 1.8rem)', fontWeight: 800, color: 'var(--paper)' }}>{n}</div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.55rem', letterSpacing: '0.28em', color: 'var(--paper-dim)' }}>{l}</div>
@@ -109,7 +110,7 @@ export default function HomePage() {
                     <span key={i} style={{ width: 1.5, height: 18, background: i % 3 === 0 ? 'var(--paper)' : 'var(--paper-dim)' }} />
                   ))}
                 </div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.45rem', color: 'var(--paper-dim)' }}>9.99 USD</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.45rem', color: 'var(--paper-dim)' }}>{amountStr(PRICING.fieldAgent.amount)} USD</div>
               </div>
 
               {/* Big № behind */}
@@ -197,17 +198,17 @@ export default function HomePage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 24 }}>
             {/* Analyst (free) */}
-            <TierCard tier="ANALYST" price="0" period="forever" desc="Sample one declassified issue per quarter." highlight={false}
+            <TierCard tier="ANALYST" price={amountStr(PRICING.analyst.amount)} period="forever" desc="Sample one declassified issue per quarter." highlight={false}
               features={[{ label: '1 sample issue per quarter' }, { label: 'Read in browser only' }, { label: 'Public archive index' }, { label: 'PDF download', locked: true }, { label: 'Full archive access', locked: true }]}
               ctaLabel="Create Account" ctaHref="/register" sealColor="var(--paper-dim)" />
 
             {/* Field Agent */}
-            <TierCard tier="FIELD AGENT" price="9.99" period="month" desc="Full active access. New issue every month, on the day it drops." highlight badge="MOST RECRUITED"
+            <TierCard tier="FIELD AGENT" price={amountStr(PRICING.fieldAgent.amount)} period="month" desc="Full active access. New issue every month, on the day it drops." highlight badge="MOST RECRUITED"
               features={[{ label: 'New issue every month' }, { label: 'Full archive · 12 months' }, { label: 'PDF download · offline' }, { label: 'Encrypted reader' }, { label: 'Cancel anytime' }]}
               ctaLabel="Receive Brief" ctaHref="/clearance" sealColor="var(--red)" />
 
             {/* Station Chief */}
-            <TierCard tier="STATION CHIEF" price="89.99" period="year" desc="Lifetime archive. All declassified issues, plus locked Chief-only briefs." highlight={false}
+            <TierCard tier="STATION CHIEF" price={amountStr(PRICING.stationChief.amount)} period="year" desc="Lifetime archive. All declassified issues, plus locked Chief-only briefs." highlight={false}
               features={[{ label: 'Everything in Field Agent' }, { label: 'Complete archive · all issues' }, { label: 'Chief-only locked briefs' }, { label: 'Priority intelligence inbox' }, { label: 'Save 25% vs monthly' }]}
               ctaLabel="Select Tier" ctaHref="/clearance?plan=annual" sealColor="var(--gold)" />
           </div>

@@ -1,5 +1,6 @@
 'use client'
 import Navbar from '@/components/Navbar'
+import { FIELD_AGENT_MONTHLY, STATION_CHIEF_ANNUAL } from '@/lib/pricing'
 
 const LAST_UPDATED = 'May 18, 2026'
 const EFFECTIVE_DATE = 'May 18, 2026'
@@ -18,7 +19,7 @@ const sections = [
   {
     id: '03',
     title: 'Subscription Tiers & Billing',
-    content: `The Service offers the following access tiers:\n\n◆ ANALYST — Free tier. One sample issue per quarter, browser access only.\n\n◆ FIELD AGENT — $19.99/month. Full monthly issue access, 12-month archive, PDF download, and encrypted reader.\n\n◆ STATION CHIEF — $99.99/year. All Field Agent benefits plus complete archive, Chief-only briefs, and priority inbox.\n\nSubscriptions are billed in advance on a recurring basis (monthly or annually). You authorize us to charge your payment method automatically at the start of each billing cycle. All fees are non-refundable except as described in our Refund Policy.`
+    content: `The Service offers the following access tiers:\n\n◆ ANALYST — Free tier. One sample issue per quarter, browser access only.\n\n◆ FIELD AGENT — ${FIELD_AGENT_MONTHLY}/month. Full monthly issue access, 12-month archive, PDF download, and encrypted reader.\n\n◆ STATION CHIEF — ${STATION_CHIEF_ANNUAL}/year. All Field Agent benefits plus complete archive, Chief-only briefs, and priority inbox.\n\nSubscriptions are billed in advance on a recurring basis (monthly or annually). You authorize us to charge your payment method automatically at the start of each billing cycle. All fees are non-refundable except as described in our Refund Policy.`
   },
   {
     id: '04',

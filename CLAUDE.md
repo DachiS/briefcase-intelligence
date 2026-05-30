@@ -29,11 +29,13 @@ Two parallel auth mechanisms coexist — both are checked in `src/lib/auth.ts:ge
 
 ### Payment flow
 
-The codebase has **two payment integrations** in different states:
-- **Flitt** (`src/lib/flitt.ts`, `src/app/api/flitt/`) — the active integration. Uses a hosted checkout flow: frontend calls `/api/flitt/create-token` → gets a token → redirects to `pay.flitt.com`. Flitt POSTs back to `/api/flitt/webhook` with form data. Subscription records are written directly to the DB using Prisma's `Subscription` model, reusing `stripeSubscriptionId`/`stripePriceId` fields for Flitt's `payment_id`/plan.
-- **Stripe** — referenced in `src/lib/stripe.ts` and `package.json` but the API routes were removed. The Prisma schema still uses Stripe field naming.
+Payments are processed by **Paddle** (Merchant of Record):
+- **Pricing** is defined once in `src/lib/pricing.ts` — the single source of truth for every displayed amount. `src/lib/paddle.ts` (`PLANS`) sources its prices and live Paddle `pri_…` price IDs from `pricing.ts`.
+- **Checkout** — `/subscribe` loads Paddle.js and opens the overlay checkout (`Paddle.Checkout.open`) with the selected plan's price ID. Requires `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN` (set `NEXT_PUBLIC_PADDLE_ENV=sandbox` for the sandbox).
+- **Webhook** — `src/app/api/paddle/webhook/route.ts` verifies the `Paddle-Signature` header with `PADDLE_WEBHOOK_SECRET` and writes `Subscription` records, reusing the `stripeSubscriptionId`/`stripePriceId` fields for Paddle's subscription/price id. `src/app/api/paddle/cancel/route.ts` cancels at period end via `PADDLE_API_KEY`.
+- **Stripe** — referenced only in `package.json`; its lib and API routes were removed. The Prisma schema still uses Stripe field naming.
 
-The test Flitt merchant (ID `1549901`) only supports GEL currency. Production requires `FLITT_MERCHANT_ID` env var set to a real merchant ID for USD.
+Set the `paddlePriceId` values in `src/lib/pricing.ts` to match the products created in the Paddle dashboard before going live.
 
 ### Site access gate
 
@@ -63,7 +65,8 @@ GOOGLE_CLIENT_ID
 GOOGLE_CLIENT_SECRET
 AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_BUCKET
 EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASS, EMAIL_FROM
-FLITT_MERCHANT_ID, FLITT_SECRET_KEY
+PADDLE_API_KEY, PADDLE_WEBHOOK_SECRET
+NEXT_PUBLIC_PADDLE_CLIENT_TOKEN, NEXT_PUBLIC_PADDLE_ENV   # NEXT_PUBLIC_PADDLE_ENV=sandbox for sandbox checkout
 SITE_ACCESS_CODE          # optional, defaults to "briefcase"
 NEXT_PUBLIC_APP_URL
 ```

@@ -2,9 +2,10 @@
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import SpyGlobe from '@/components/SpyGlobe'
+import { PRICING, fmt, amountStr } from '@/lib/pricing'
 
 const articles = [
-  { num: '01', category: 'Latest News',            title: 'Missing Russian Businessman',  desc: 'The mysterious disappearance of prominent oligarch Dmitri Volkov raises questions that reach far beyond a missing persons case.' },
+  { num: '01', category: 'Dossier',                 title: 'Missing Russian Businessman',  desc: 'The mysterious disappearance of prominent oligarch Dmitri Volkov raises questions that reach far beyond a missing persons case.' },
   { num: '02', category: 'History of Intelligence', title: 'Born of Spies',                desc: 'From informants to agencies — the evolution of state intelligence from ancient Persia to Cold War Vienna.' },
   { num: '03', category: 'Operations',              title: "Mossad's Christmas Heist",     desc: 'Five missile boats, a French arms embargo, and the Cherbourg Operation.' },
   { num: '04', category: 'Exclusive Tricks',        title: 'How to Tell a Lie',            desc: 'Cover stories, legend-building, microexpression control, and the art of the convincing half-truth.' },
@@ -75,7 +76,7 @@ export default function HomePage() {
 
             {/* Trust strip */}
             <div className="anim-fade-up delay-5" style={{ display: 'flex', gap: 'clamp(16px, 4vw, 32px)', marginTop: 40, paddingTop: 24, borderTop: '1px solid var(--border)', flexWrap: 'wrap' }}>
-              {[['12,400+', 'Active operatives'], ['72', 'Declassified ops'], ['$9.99', 'Per month']].map(([n, l]) => (
+              {[['12,400+', 'Active operatives'], ['72', 'Declassified ops'], [fmt(PRICING.fieldAgent.amount), 'Per month']].map(([n, l]) => (
                 <div key={l}>
                   <div style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.4rem, 4vw, 1.8rem)', fontWeight: 800, color: 'var(--paper)' }}>{n}</div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.55rem', letterSpacing: '0.28em', color: 'var(--paper-dim)' }}>{l}</div>
@@ -109,7 +110,7 @@ export default function HomePage() {
                     <span key={i} style={{ width: 1.5, height: 18, background: i % 3 === 0 ? 'var(--paper)' : 'var(--paper-dim)' }} />
                   ))}
                 </div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.45rem', color: 'var(--paper-dim)' }}>9.99 USD</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.45rem', color: 'var(--paper-dim)' }}>{amountStr(PRICING.fieldAgent.amount)} USD</div>
               </div>
 
               {/* Big № behind */}
@@ -146,12 +147,12 @@ export default function HomePage() {
           {/* Featured article */}
           <article className="card-base" style={{ padding: 24, position: 'relative', overflow: 'hidden' }}>
             <div style={{ aspectRatio: '4/3', background: 'linear-gradient(135deg, #1a0a0a 0%, #0a1628 100%)', position: 'relative', marginBottom: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border)' }}>
-              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--paper-mute)', fontSize: '0.62rem', letterSpacing: '0.3em' }}>[SURVEILLANCE PHOTO 01]</span>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--paper-mute)', fontSize: '0.62rem', letterSpacing: '0.3em' }}>SURVEILLANCE FILE — IMAGE WITHHELD</span>
               <div style={{ position: 'absolute', top: 10, left: 10 }}>
                 <span className="stamp red">FEATURED</span>
               </div>
             </div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.3em', color: 'var(--paper-dim)', marginBottom: 8 }}>FILE 01 · LATEST NEWS</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.3em', color: 'var(--paper-dim)', marginBottom: 8 }}>FILE 01 · DOSSIER</div>
             <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase', lineHeight: 0.92, margin: 0, marginBottom: 10 }}>Missing Russian Businessman</h3>
             <p style={{ fontFamily: 'var(--font-body)', fontSize: '0.85rem', color: 'var(--paper-dim)', lineHeight: 1.6, margin: 0 }}>
               The mysterious disappearance of prominent oligarch <span className="redact" style={{ width: 110 }}>Dmitri Volkov</span> raises
@@ -197,17 +198,17 @@ export default function HomePage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 24 }}>
             {/* Analyst (free) */}
-            <TierCard tier="ANALYST" price="0" period="forever" desc="Sample one declassified issue per quarter." highlight={false}
+            <TierCard tier="ANALYST" price={amountStr(PRICING.analyst.amount)} period="forever" desc="Sample one declassified issue per quarter." highlight={false}
               features={[{ label: '1 sample issue per quarter' }, { label: 'Read in browser only' }, { label: 'Public archive index' }, { label: 'PDF download', locked: true }, { label: 'Full archive access', locked: true }]}
               ctaLabel="Create Account" ctaHref="/register" sealColor="var(--paper-dim)" />
 
             {/* Field Agent */}
-            <TierCard tier="FIELD AGENT" price="9.99" period="month" desc="Full active access. New issue every month, on the day it drops." highlight badge="MOST RECRUITED"
+            <TierCard tier="FIELD AGENT" price={amountStr(PRICING.fieldAgent.amount)} period="month" desc="Full active access. New issue every month, on the day it drops." highlight badge="MOST RECRUITED"
               features={[{ label: 'New issue every month' }, { label: 'Full archive · 12 months' }, { label: 'PDF download · offline' }, { label: 'Encrypted reader' }, { label: 'Cancel anytime' }]}
               ctaLabel="Receive Brief" ctaHref="/clearance" sealColor="var(--red)" />
 
             {/* Station Chief */}
-            <TierCard tier="STATION CHIEF" price="89.99" period="year" desc="Lifetime archive. All declassified issues, plus locked Chief-only briefs." highlight={false}
+            <TierCard tier="STATION CHIEF" price={amountStr(PRICING.stationChief.amount)} period="year" desc="Lifetime archive. All declassified issues, plus locked Chief-only briefs." highlight={false}
               features={[{ label: 'Everything in Field Agent' }, { label: 'Complete archive · all issues' }, { label: 'Chief-only locked briefs' }, { label: 'Priority intelligence inbox' }, { label: 'Save 25% vs monthly' }]}
               ctaLabel="Select Tier" ctaHref="/clearance?plan=annual" sealColor="var(--gold)" />
           </div>
@@ -215,7 +216,7 @@ export default function HomePage() {
           <div style={{ marginTop: 48, display: 'flex', justifyContent: 'center' }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 16, padding: '12px 24px', border: '1px dashed var(--paper-mute)', fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.24em', color: 'var(--paper-dim)' }}>
               <span style={{ color: 'var(--green)' }}>● SECURE</span>
-              <span>SECURED BY FLITT · VISA · MASTERCARD</span>
+              <span>PAYMENTS BY PADDLE · VISA · MASTERCARD</span>
               <span style={{ color: 'var(--gold)' }}>◆ NO LOG</span>
             </div>
           </div>

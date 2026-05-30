@@ -1,53 +1,59 @@
 'use client'
 import Navbar from '@/components/Navbar'
+import { FIELD_AGENT_MONTHLY, STATION_CHIEF_ANNUAL } from '@/lib/pricing'
 
-const LAST_UPDATED = 'May 18, 2026'
+const LAST_UPDATED = 'May 30, 2026'
 
 const sections = [
   {
     id: '01',
     title: 'Digital Product Policy',
-    content: `Briefcase Intelligence delivers digital content (issues, archive access, PDF downloads) that is made immediately available upon subscription activation. As such, all sales are generally final. We do not offer refunds for digital content that has already been accessed or downloaded.`
+    content: `Briefcase Intelligence delivers digital content (issues, archive access, PDF downloads) made available immediately upon subscription activation. Because the content is delivered digitally, refund eligibility is limited as described below. This policy does not affect any statutory rights you may have under applicable consumer law.`
   },
   {
     id: '02',
-    title: 'Eligibility for Refund',
-    content: `You may be eligible for a refund in the following circumstances:\n\n◆ You were charged but did not receive access to the Service due to a technical failure on our end.\n\n◆ You were charged twice for the same billing period due to a payment processing error.\n\n◆ You request a refund within 48 hours of your initial subscription charge and have not accessed any paid content.\n\nRequests outside these conditions are evaluated on a case-by-case basis at our discretion.`
+    title: 'Merchant of Record',
+    content: `All purchases are sold and fulfilled by Paddle.com, which acts as the Merchant of Record. Paddle processes payments, issues receipts, and administers refunds on our behalf. You may request a refund either by contacting us at support@briefcase.agency or directly through Paddle at paddle.net.`
   },
   {
     id: '03',
-    title: 'Monthly Subscriptions',
-    content: `Monthly Field Agent subscriptions ($19.99/month) are billed at the start of each billing cycle. We do not provide prorated refunds for cancellations made mid-cycle. Upon cancellation, your access continues until the end of the current paid period, after which your account reverts to the free Analyst tier.`
+    title: 'Eligibility for Refund',
+    content: `You may be eligible for a refund in the following circumstances:\n\n◆ You request a refund within 14 days of the charge and have not downloaded or accessed paid issues during that period.\n\n◆ You were charged but did not receive access due to a technical failure on our end (full refund, no time limit).\n\n◆ You were charged more than once for the same billing period due to a payment processing error (full refund of the duplicate, no time limit).\n\nRequests outside these conditions are evaluated case by case at our and Paddle's discretion.`
   },
   {
     id: '04',
-    title: 'Annual Subscriptions',
-    content: `Annual Station Chief subscriptions ($99.99/year) may be eligible for a prorated refund within 14 days of the billing date, provided fewer than 2 monthly issues have been released since your charge. After 14 days, or after 2 or more issues have been released in your billing period, no refund will be issued. The prorated amount is calculated based on unused full months remaining.`
+    title: 'Monthly Subscriptions',
+    content: `Monthly Field Agent subscriptions (${FIELD_AGENT_MONTHLY}/month) are billed at the start of each cycle. We do not provide prorated refunds for cancellations made mid-cycle. On cancellation, access continues until the end of the current paid period, after which your account reverts to the free Analyst tier.`
   },
   {
     id: '05',
-    title: 'How to Request a Refund',
-    content: `To request a refund, contact us at support@briefcase.agency with the subject line "REFUND REQUEST" and include:\n\n◆ The email address associated with your account.\n◆ The date of the charge.\n◆ A brief description of the reason for your request.\n\nWe will respond within 3 business days. Approved refunds are processed back to your original payment method and may take 5–10 business days to appear depending on your bank or card provider.`
+    title: 'Annual Subscriptions',
+    content: `Annual Station Chief subscriptions (${STATION_CHIEF_ANNUAL}/year) may be refunded within 14 days of the charge, provided fewer than 2 monthly issues have been released since the charge. After 14 days, or once 2 or more issues have been released in your billing period, the annual term is non-refundable except where required by law.`
   },
   {
     id: '06',
-    title: 'Chargebacks',
-    content: `If you initiate a chargeback with your bank or card provider without first contacting us, we reserve the right to permanently suspend your account. We encourage you to reach out to us directly — most issues can be resolved quickly and without escalation.`
+    title: 'How to Request a Refund',
+    content: `Email support@briefcase.agency with the subject "REFUND REQUEST" and include: the email on your account, the date of the charge, and a brief reason. We respond within 3 business days. Approved refunds are processed by Paddle to your original payment method and may take 5–10 business days to appear, depending on your bank or card provider.`
   },
   {
     id: '07',
-    title: 'Free Tier',
-    content: `The Analyst (free) tier requires no payment and is therefore not subject to refund considerations. No credit card is required to maintain a free account.`
+    title: 'Chargebacks',
+    content: `If you initiate a chargeback with your bank or card provider without first contacting us or Paddle, we reserve the right to suspend your account. Most issues can be resolved quickly and directly — please reach out before escalating.`
   },
   {
     id: '08',
-    title: 'Changes to This Policy',
-    content: `We reserve the right to modify this Refund Policy at any time. Material changes will be communicated via email or a notice on the Service. The updated policy applies to charges made after the effective date of the change.`
+    title: 'Free Tier',
+    content: `The Analyst (free) tier requires no payment and is not subject to refund considerations. No card is required to maintain a free account.`
   },
   {
     id: '09',
+    title: 'Changes to This Policy',
+    content: `We may modify this Refund Policy at any time. Material changes will be communicated via email or a notice on the Service and apply to charges made after the effective date.`
+  },
+  {
+    id: '10',
     title: 'Contact',
-    content: `For refund requests or billing questions:\n\nBriefcase Intelligence\nwww.briefcase.agency\nsupport@briefcase.agency\n\nOperating hours: Monday – Friday, 09:00 – 18:00 GMT+4`
+    content: `Briefcase Intelligence\n\nwww.briefcase.agency\n\nsupport@briefcase.agency\n\nOperating hours: Monday–Friday, 09:00–18:00 GMT+4`
   },
 ]
 
@@ -91,10 +97,10 @@ export default function RefundPage() {
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.55rem', letterSpacing: '0.3em', color: 'var(--red)', marginBottom: 10 }}>// QUICK SUMMARY</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {[
+              { label: 'Merchant of Record', value: 'Payments and refunds are handled by Paddle' },
               { label: 'Monthly plan', value: 'Cancel anytime · access until period ends · no proration' },
               { label: 'Annual plan', value: 'Refund eligible within 14 days if fewer than 2 issues released' },
-              { label: 'Technical errors', value: 'Full refund · always' },
-              { label: 'Double charge', value: 'Full refund of duplicate · always' },
+              { label: 'Technical / duplicate charge', value: 'Full refund · always' },
             ].map((row, i) => (
               <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                 <span style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', paddingTop: 1 }}>◆</span>

@@ -1,13 +1,18 @@
 // src/lib/paddle.ts
 
+import { PRICING } from './pricing'
+
 export const PADDLE_API_URL = 'https://api.paddle.com' // Change to https://api.paddle.com for live
 
+// Plan metadata for the Paddle integration. Price + Paddle price ID are sourced
+// from the single pricing source of truth (`src/lib/pricing.ts`) so amounts can
+// never drift between the checkout config and what the site renders.
 export const PLANS = {
   monthly: {
-    name: 'Field Agent',
-    priceId: 'pri_01kj2yh67dkt5vntse04hpjkav',
-    price: 9.99,
-    interval: 'month',
+    name: PRICING.fieldAgent.name,
+    priceId: PRICING.fieldAgent.paddlePriceId,
+    price: PRICING.fieldAgent.amount,
+    interval: PRICING.fieldAgent.interval,
     description: 'Access to all issues, billed monthly',
     features: [
       'Full access to all PDF issues',
@@ -17,10 +22,10 @@ export const PLANS = {
     ],
   },
   annual: {
-    name: 'Station Chief',
-    priceId: 'pri_01kj2yjnpb7yypb6rkx85zfz8a',
-    price: 89.99,
-    interval: 'year',
+    name: PRICING.stationChief.name,
+    priceId: PRICING.stationChief.paddlePriceId,
+    price: PRICING.stationChief.amount,
+    interval: PRICING.stationChief.interval,
     description: 'Best value — save 25%, billed annually',
     features: [
       'Full access to all PDF issues',

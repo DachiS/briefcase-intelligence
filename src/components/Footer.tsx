@@ -39,6 +39,12 @@ export default function Footer() {
           ))}
         </div>
       </div>
+
+      <div style={{ maxWidth: '1100px', margin: '20px auto 0', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.5rem', lineHeight: 1.7, letterSpacing: '0.08em', color: 'var(--paper-mute)', margin: 0, maxWidth: '780px' }}>
+          Briefcase Intelligence is an independent editorial and entertainment publication. It is not affiliated with, endorsed by, or connected to any government, intelligence agency, or military organization. All content is original work or commentary on matters of public record. References to classifications, clearances, and operations are stylistic and fictional unless explicitly sourced.
+        </p>
+      </div>
     </footer>
   )
 }

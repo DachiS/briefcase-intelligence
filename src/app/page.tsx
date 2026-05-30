@@ -5,7 +5,7 @@ import SpyGlobe from '@/components/SpyGlobe'
 import { PRICING, fmt, amountStr } from '@/lib/pricing'
 
 const articles = [
-  { num: '01', category: 'Latest News',            title: 'Missing Russian Businessman',  desc: 'The mysterious disappearance of prominent oligarch Dmitri Volkov raises questions that reach far beyond a missing persons case.' },
+  { num: '01', category: 'Dossier',                 title: 'Missing Russian Businessman',  desc: 'The mysterious disappearance of prominent oligarch Dmitri Volkov raises questions that reach far beyond a missing persons case.' },
   { num: '02', category: 'History of Intelligence', title: 'Born of Spies',                desc: 'From informants to agencies — the evolution of state intelligence from ancient Persia to Cold War Vienna.' },
   { num: '03', category: 'Operations',              title: "Mossad's Christmas Heist",     desc: 'Five missile boats, a French arms embargo, and the Cherbourg Operation.' },
   { num: '04', category: 'Exclusive Tricks',        title: 'How to Tell a Lie',            desc: 'Cover stories, legend-building, microexpression control, and the art of the convincing half-truth.' },
@@ -147,12 +147,12 @@ export default function HomePage() {
           {/* Featured article */}
           <article className="card-base" style={{ padding: 24, position: 'relative', overflow: 'hidden' }}>
             <div style={{ aspectRatio: '4/3', background: 'linear-gradient(135deg, #1a0a0a 0%, #0a1628 100%)', position: 'relative', marginBottom: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border)' }}>
-              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--paper-mute)', fontSize: '0.62rem', letterSpacing: '0.3em' }}>[SURVEILLANCE PHOTO 01]</span>
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--paper-mute)', fontSize: '0.62rem', letterSpacing: '0.3em' }}>SURVEILLANCE FILE — IMAGE WITHHELD</span>
               <div style={{ position: 'absolute', top: 10, left: 10 }}>
                 <span className="stamp red">FEATURED</span>
               </div>
             </div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.3em', color: 'var(--paper-dim)', marginBottom: 8 }}>FILE 01 · LATEST NEWS</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.3em', color: 'var(--paper-dim)', marginBottom: 8 }}>FILE 01 · DOSSIER</div>
             <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase', lineHeight: 0.92, margin: 0, marginBottom: 10 }}>Missing Russian Businessman</h3>
             <p style={{ fontFamily: 'var(--font-body)', fontSize: '0.85rem', color: 'var(--paper-dim)', lineHeight: 1.6, margin: 0 }}>
               The mysterious disappearance of prominent oligarch <span className="redact" style={{ width: 110 }}>Dmitri Volkov</span> raises

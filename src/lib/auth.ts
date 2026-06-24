@@ -36,7 +36,7 @@ export async function getCurrentUser() {
         where: { id: payload.userId },
         include: {
           subscriptions: {
-            where: { status: 'ACTIVE' },
+            where: { status: 'ACTIVE', currentPeriodEnd: { gt: new Date() } },
             orderBy: { createdAt: 'desc' },
             take: 1,
           },
@@ -53,7 +53,7 @@ export async function getCurrentUser() {
       where: { email: session.user.email.toLowerCase() },
       include: {
         subscriptions: {
-          where: { status: 'ACTIVE' },
+          where: { status: 'ACTIVE', currentPeriodEnd: { gt: new Date() } },
           orderBy: { createdAt: 'desc' },
           take: 1,
         },

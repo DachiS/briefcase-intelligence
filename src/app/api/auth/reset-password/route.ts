@@ -7,6 +7,8 @@ import { prisma } from '@/lib/prisma'
 
 import bcrypt from 'bcryptjs'
 
+import crypto from 'crypto'
+
 export async function POST(req: NextRequest) {
   try {
     const { token, password } = await req.json()
@@ -19,37 +21,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
     }
 
-    // Find user with this reset token
-    const users = await prisma.user.findMany({
-      where: {
-        verificationToken: {
-          startsWith: `reset_${token}_`,
-        },
-      },
+    // Look the user up by the token HASH — we never store the raw token.
+    const resetTokenHash = crypto.createHash('sha256').update(token).digest('hex')
+    const user = await prisma.user.findFirst({
+      where: { resetTokenHash },
     })
 
-    if (users.length === 0) {
+    if (!user || !user.resetTokenExpiry) {
       return NextResponse.json({ error: 'Invalid or expired reset link' }, { status: 400 })
     }
 
-    const user = users[0]
-
-    // Check expiry
-    const tokenParts = user.verificationToken!.split('_')
-    const expiry = parseInt(tokenParts[tokenParts.length - 1])
-
-    if (Date.now() > expiry) {
+    if (Date.now() > user.resetTokenExpiry.getTime()) {
       return NextResponse.json({ error: 'Reset link has expired. Please request a new one.' }, { status: 400 })
     }
 
-    // Update password
+    // Update password, clear the reset token, and bump tokenVersion so every
+    // JWT issued before this reset is invalidated (locks out any stolen session).
     const hashedPassword = await bcrypt.hash(password, 12)
 
     await prisma.user.update({
       where: { id: user.id },
       data: {
         password: hashedPassword,
-        verificationToken: null,
+        resetTokenHash: null,
+        resetTokenExpiry: null,
+        tokenVersion: { increment: 1 },
       },
     })
 

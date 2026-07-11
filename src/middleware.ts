@@ -3,7 +3,17 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const ACCESS_CODE = process.env.SITE_ACCESS_CODE
 const COOKIE_NAME = 'site_access'
-const PUBLIC_PATHS = ['/api/site-access', '/_next', '/favicon.ico']
+// Paths that must bypass the "coming soon" gate. External callers (Paddle
+// webhooks, Google OAuth callbacks) can never present the site_access cookie,
+// so gating them silently breaks payment activation and social login. The gate
+// is meant to hide the marketing/reader surface, not the machine-to-machine API.
+const PUBLIC_PATHS = [
+  '/api/site-access',
+  '/api/paddle/webhook',
+  '/api/auth', // NextAuth (Google) callbacks + credential auth endpoints
+  '/_next',
+  '/favicon.ico',
+]
 
 export function middleware(req: NextRequest) {
   // If no access code is set, allow everyone through

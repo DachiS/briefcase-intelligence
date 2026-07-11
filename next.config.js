@@ -1,10 +1,20 @@
 /** @type {import('next').NextConfig} */
+
+// Derive the allowed S3 image host from env so it always matches the real
+// bucket instead of a stale placeholder. Covers both the global and
+// region-scoped virtual-hosted S3 URL styles.
+const bucket = process.env.AWS_S3_BUCKET
+const region = process.env.AWS_REGION
+const remotePatterns = bucket
+  ? [
+      { protocol: 'https', hostname: `${bucket}.s3.amazonaws.com` },
+      ...(region ? [{ protocol: 'https', hostname: `${bucket}.s3.${region}.amazonaws.com` }] : []),
+    ]
+  : []
+
 const nextConfig = {
   images: {
-    domains: [
-      'your-s3-bucket.s3.amazonaws.com',
-      'your-s3-bucket.s3.us-east-1.amazonaws.com',
-    ],
+    remotePatterns,
   },
 }
 

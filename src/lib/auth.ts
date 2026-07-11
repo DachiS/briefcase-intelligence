@@ -1,5 +1,6 @@
 // src/lib/auth.ts
 import jwt from 'jsonwebtoken'
+import { cache } from 'react'
 import { cookies } from 'next/headers'
 import { getServerSession } from 'next-auth'
 import { prisma } from './prisma'
@@ -10,6 +11,10 @@ export interface JWTPayload {
   userId: string
   email: string
   role: string
+  // Snapshot of the user's tokenVersion at sign time. When the user resets
+  // their password we bump the DB value, so any older token no longer matches
+  // and is rejected in getCurrentUser().
+  tokenVersion?: number
 }
 
 export function signToken(payload: JWTPayload): string {
@@ -24,7 +29,11 @@ export function verifyToken(token: string): JWTPayload | null {
   }
 }
 
-export async function getCurrentUser() {
+// Wrapped in React cache() so repeated calls within a single request (multiple
+// guards, a layout + page, an API route calling both requireAuth and
+// requireSubscription) share one result instead of re-running the DB/session
+// lookups. Freshness is unaffected — the cache is per-request only (#16).
+export const getCurrentUser = cache(async () => {
   // First try JWT cookie
   const cookieStore = await cookies()
   const token = cookieStore.get('auth-token')?.value
@@ -42,7 +51,10 @@ export async function getCurrentUser() {
           },
         },
       })
-      if (user) return user
+      // Reject tokens issued before the user's last password reset. Tokens
+      // predating this feature carry no tokenVersion; treat that as 0 so
+      // existing sessions of users who never reset stay valid.
+      if (user && (payload.tokenVersion ?? 0) === user.tokenVersion) return user
     }
   }
 
@@ -63,7 +75,7 @@ export async function getCurrentUser() {
   }
 
   return null
-}
+})
 
 export async function requireAuth() {
   const user = await getCurrentUser()

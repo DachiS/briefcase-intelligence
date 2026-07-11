@@ -9,15 +9,33 @@ import { prisma } from '@/lib/prisma'
 
 import { signToken } from '@/lib/auth'
 
+import { checkRateLimit, resetRateLimit, clientIp } from '@/lib/rate-limit'
+
+// A fixed bcrypt hash used to burn ~the same CPU when the account doesn't exist
+// (or has no password), so response timing can't distinguish "no such email"
+// from "wrong password" — closing the timing-based enumeration channel (#10).
+// This is the hash of a random throwaway string; it never matches any password.
+const DUMMY_HASH = '$2a$12$3XK9pHtmG5HXRodsWOZB8uQ1dYMwn.Ui2Dr504CzMnDYaFhaC/bou'
+
 export async function POST(req: NextRequest) {
   try {
     const { email, password } = await req.json()
 
-    console.log('Login attempt for:', email)
-    console.log('Password received:', password)
-    const normalizedEmail = email.toLowerCase()
     if (!email || !password) {
       return NextResponse.json({ error: 'Email and password required' }, { status: 400 })
+    }
+    const normalizedEmail = email.toLowerCase()
+
+    // Throttle brute-force attempts, per IP and per targeted account.
+    const ip = clientIp(req)
+    const byIp = checkRateLimit(`login:ip:${ip}`, 10, 10 * 60_000)
+    const byEmail = checkRateLimit(`login:email:${normalizedEmail}`, 5, 10 * 60_000)
+    if (!byIp.success || !byEmail.success) {
+      const retryAfter = Math.max(byIp.retryAfter, byEmail.retryAfter)
+      return NextResponse.json(
+        { error: 'Too many attempts. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(retryAfter) } }
+      )
     }
 
     const user = await prisma.user.findUnique({
@@ -30,18 +48,12 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    console.log('User found:', !!user)
-    console.log('Stored hash:', user?.password)
-    console.log('Email verified:', user?.emailVerified)
+    // Always run a bcrypt comparison, even when the account is missing or is an
+    // OAuth-only account with an empty password hash. This equalizes response
+    // timing so an attacker can't enumerate valid emails by measuring latency.
+    const valid = await bcrypt.compare(password, user?.password || DUMMY_HASH)
 
-    if (!user) {
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
-    }
-
-    const valid = await bcrypt.compare(password, user.password)
-    console.log('Password valid:', valid)
-
-    if (!valid) {
+    if (!user || !user.password || !valid) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
@@ -52,10 +64,15 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Successful auth — clear the per-email throttle so a legitimate user isn't
+    // locked out by their own repeated (successful) logins.
+    resetRateLimit(`login:email:${normalizedEmail}`)
+
     const token = signToken({
       userId: user.id,
       email: user.email,
       role: user.role,
+      tokenVersion: user.tokenVersion,
     })
 
     const response = NextResponse.json({

@@ -13,8 +13,9 @@ export const dynamic = 'force-dynamic'
 // live/sandbox Paddle account before going to production.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyPaddleWebhook } from '@/lib/paddle'
+import { verifyPaddleWebhook, PLANS } from '@/lib/paddle'
 import { PRICING } from '@/lib/pricing'
+import { sendWelcomeEmail } from '@/lib/email'
 import { prisma } from '@/lib/prisma'
 import type { Prisma, SubscriptionStatus } from '@prisma/client'
 
@@ -57,28 +58,35 @@ async function resolveSubscriptionRecord(data: any) {
     if (bySubId) return bySubId
   }
 
-  const userId = await resolveUserId(data)
-  if (userId) {
+  const user = await resolveUser(data)
+  if (user) {
     return prisma.subscription.findFirst({
-      where: { userId },
+      where: { userId: user.id },
       orderBy: { createdAt: 'desc' },
     })
   }
   return null
 }
 
-// Resolve the owning user from custom_data, then by customer email.
-async function resolveUserId(data: any): Promise<string | undefined> {
+type ResolvedUser = { id: string; email: string; name: string }
+
+// Resolve the owning user for an event. One DB query; the result is reused by
+// callers (activation reuses it for the welcome email) to avoid re-querying.
+//
+// SECURITY (#4): custom_data is set in the browser (subscribe/page.tsx) and is
+// fully attacker-controlled — a tampered checkout could point custom.userId /
+// custom.email at someone else's account. So we prefer Paddle's OWN verified
+// customer email (the email the payment was actually made with) and never trust
+// a client-supplied userId. custom.email is only a last-resort fallback for
+// events where Paddle doesn't inline the customer email.
+async function resolveUser(data: any): Promise<ResolvedUser | null> {
   const custom = data.custom_data || {}
-  if (custom.userId) return custom.userId
-  const email: string | undefined = custom.email || data.customer?.email
-  if (email) {
-    const u = await prisma.user.findUnique({
-      where: { email: String(email).toLowerCase() },
-    })
-    return u?.id
-  }
-  return undefined
+  const email: string | undefined = data.customer?.email || custom.email
+  if (!email) return null
+  return prisma.user.findUnique({
+    where: { email: String(email).toLowerCase() },
+    select: { id: true, email: true, name: true },
+  })
 }
 
 // Activation: create or update the record to ACTIVE for the purchased plan.
@@ -87,16 +95,21 @@ async function handleActivation(data: any) {
 
   const priceId: string | undefined =
     data.items?.[0]?.price?.id || data.items?.[0]?.price_id || data.details?.line_items?.[0]?.price_id
+  // SECURITY: derive the plan from the Paddle-verified price ID, NEVER from
+  // custom_data. custom_data is set in the browser (subscribe/page.tsx) and is
+  // fully attacker-controlled — trusting custom.plan would let a buyer of the
+  // monthly plan self-upgrade to annual access. Only fall back to custom.plan
+  // when the price ID is unrecognised (e.g. a new/unmapped Paddle product).
   const plan: 'monthly' | 'annual' =
-    custom.plan === 'annual' || custom.plan === 'monthly'
-      ? custom.plan
-      : planFromPriceId(priceId) || 'monthly'
+    planFromPriceId(priceId) ||
+    (custom.plan === 'annual' || custom.plan === 'monthly' ? custom.plan : 'monthly')
 
-  const userId = await resolveUserId(data)
-  if (!userId) {
+  const owner = await resolveUser(data)
+  if (!owner) {
     console.error('Paddle webhook: could not resolve user from event', { custom })
     return
   }
+  const userId = owner.id
 
   // Prefer the subscription id (sub_…). On transaction.completed, data.id is a
   // txn_… id while data.subscription_id holds the sub id we need for cancels.
@@ -129,6 +142,20 @@ async function handleActivation(data: any) {
     await prisma.subscription.update({ where: { id: existing.id }, data: fields })
   } else {
     await prisma.subscription.create({ data: { userId, ...fields } })
+  }
+
+  // Send the welcome email only on a genuine activation (no prior record, or a
+  // record that was not already ACTIVE) so repeated activation events for the
+  // same subscription — Paddle sends both subscription.created and
+  // transaction.completed — don't email the customer twice.
+  if (!existing || existing.status !== 'ACTIVE') {
+    try {
+      // Reuse the already-resolved owner record — no extra query.
+      await sendWelcomeEmail(owner.email, owner.name, PLANS[plan].name)
+    } catch (e) {
+      // Never fail the webhook because the welcome email bounced.
+      console.error('Welcome email failed (non-fatal):', e)
+    }
   }
 
   console.log(`Paddle subscription activated for user ${userId}, plan: ${plan}`)
@@ -197,10 +224,15 @@ export async function POST(req: NextRequest) {
       await handleLifecycle(type, data)
     }
 
-    // Always 200 so Paddle doesn't retry events we intentionally ignore.
+    // 200 for events we handled or intentionally ignore. Signature was already
+    // verified above, so reaching here means the payload was authentic.
     return new NextResponse('OK')
   } catch (error) {
+    // A verified event that we FAILED to process (e.g. a transient DB outage
+    // during activation) must return a non-2xx so Paddle retries — otherwise a
+    // paid subscription is silently lost. Signature failures return 403 earlier
+    // and never reach this catch.
     console.error('Paddle webhook error:', error)
-    return new NextResponse('OK')
+    return new NextResponse('ERROR', { status: 500 })
   }
 }

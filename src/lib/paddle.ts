@@ -2,7 +2,13 @@
 
 import { PRICING } from './pricing'
 
-export const PADDLE_API_URL = 'https://api.paddle.com' // Change to https://api.paddle.com for live
+// Server-side Paddle REST base. Switches to the sandbox host when
+// NEXT_PUBLIC_PADDLE_ENV=sandbox so the cancel route (and any future API calls)
+// hit the same environment the checkout runs in. Defaults to live.
+export const PADDLE_API_URL =
+  process.env.NEXT_PUBLIC_PADDLE_ENV === 'sandbox'
+    ? 'https://sandbox-api.paddle.com'
+    : 'https://api.paddle.com'
 
 // Plan metadata for the Paddle integration. Price + Paddle price ID are sourced
 // from the single pricing source of truth (`src/lib/pricing.ts`) so amounts can

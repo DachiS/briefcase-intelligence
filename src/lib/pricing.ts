@@ -34,14 +34,19 @@ export const PRICING = {
     amount: 9.99,
     interval: 'month',
     currency: 'USD',
-    paddlePriceId: 'pri_01kj2yh67dkt5vntse04hpjkav',
+    // Per-environment override (sandbox vs live) via env; the literal is the
+    // live default. Must be NEXT_PUBLIC_ so it's available in the browser
+    // checkout AND server-side webhook plan mapping.
+    paddlePriceId:
+      process.env.NEXT_PUBLIC_PADDLE_PRICE_MONTHLY || 'pri_01kj2yh67dkt5vntse04hpjkav',
   },
   stationChief: {
     name: 'Station Chief',
     amount: 89.99,
     interval: 'year',
     currency: 'USD',
-    paddlePriceId: 'pri_01kj2yjnpb7yypb6rkx85zfz8a',
+    paddlePriceId:
+      process.env.NEXT_PUBLIC_PADDLE_PRICE_ANNUAL || 'pri_01kj2yjnpb7yypb6rkx85zfz8a',
   },
 } as const satisfies Record<string, PricingTier>
 

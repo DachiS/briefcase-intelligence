@@ -161,9 +161,7 @@ export default function DashboardPage() {
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.55rem', letterSpacing: '0.28em', color: 'var(--paper-dim)', marginBottom: 14 }}>QUICK ACTIONS</div>
               {([
                 user.hasSubscription ? ['→', 'Browse current issues', '/issues'] : null,
-                user.hasSubscription
-                  ? ['◆', 'Manage subscription', '#subscription-card']
-                  : ['◆', 'Subscribe / choose plan', '/clearance'],
+                !user.hasSubscription ? ['◆', 'Subscribe / choose plan', '/clearance'] : null,
               ].filter((x): x is string[] => x !== null)).map(([k, l, href], i, arr) => (
                 <Link key={l} href={href} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 0', borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none', textDecoration: 'none', color: 'inherit' }}>
                   <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--red)', fontSize: '0.85rem', width: 16 }}>{k}</span>

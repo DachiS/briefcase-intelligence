@@ -19,8 +19,13 @@ function SubscribePage() {
     fetch('/api/auth/me')
       .then(r => r.json())
       .then(d => {
+        // Already subscribed → don't let them buy a second time; send to dashboard.
+        if (d.user?.hasSubscription) { router.replace('/dashboard'); return }
         if (d.user) { setIsLoggedIn(true); setEmail(d.user.email || '') }
-        else if (status === 'authenticated' && session?.user) { setIsLoggedIn(true); setEmail(session.user.email || '') }
+        else if (status === 'authenticated' && session?.user) {
+          if ((session.user as any).hasSubscription) { router.replace('/dashboard'); return }
+          setIsLoggedIn(true); setEmail(session.user.email || '')
+        }
         else if (status !== 'loading') setIsLoggedIn(false)
       })
       .catch(() => { if (status === 'authenticated') setIsLoggedIn(true); else setIsLoggedIn(false) })

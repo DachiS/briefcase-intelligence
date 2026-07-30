@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Navbar from '@/components/Navbar'
+import { FIELD_AGENT_MONTHLY, STATION_CHIEF_ANNUAL } from '@/lib/pricing'
 
 interface User {
   id: string; name: string; email: string; role: string; hasSubscription: boolean
@@ -93,12 +94,28 @@ export default function DashboardPage() {
   }
 
   const handleChangePlan = async (plan: 'monthly' | 'annual') => {
-    const msg = plan === 'annual'
-      ? 'Upgrade to the annual plan? You’ll be charged the prorated difference now and billed yearly going forward.'
-      : 'Switch to the monthly plan? Your billing changes to monthly, prorated from today.'
-    if (!confirm(msg)) return
     setChanging(true)
     try {
+      // Show the exact amount Paddle will charge now (nets any account credit).
+      let chargeLine = 'You’ll be charged the prorated difference now. '
+      try {
+        const pv = await fetch('/api/paddle/change-plan/preview', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan }),
+        }).then(r => r.json())
+        if (typeof pv.amountMinor === 'number') {
+          const amt = pv.amountMinor / 100
+          chargeLine = amt > 0
+            ? `You’ll be charged ${pv.currency} ${amt.toFixed(2)} now (prorated). `
+            : 'No charge now — it’s covered by your account credit. '
+        }
+      } catch { /* fall back to the generic line */ }
+
+      const forward = plan === 'annual' ? `${STATION_CHIEF_ANNUAL}/year` : `${FIELD_AGENT_MONTHLY}/month`
+      const title = plan === 'annual' ? 'Upgrade to the annual plan?' : 'Switch to the monthly plan?'
+      if (!confirm(`${title}\n\n${chargeLine}You’ll then be billed ${forward} going forward.`)) {
+        return
+      }
+
       const res = await fetch('/api/paddle/change-plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

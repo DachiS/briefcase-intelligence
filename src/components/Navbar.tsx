@@ -6,6 +6,7 @@ import { signOut } from 'next-auth/react'
 
 interface User {
   id: string; name: string; email: string; role: string; hasSubscription: boolean
+  subscription?: { plan?: string } | null
 }
 
 function useUtcTime() {
@@ -74,7 +75,11 @@ export default function Navbar() {
     router.push('/'); router.refresh()
   }
 
-  const clearance = user?.role === 'ADMIN' ? 'DIRECTOR' : user?.hasSubscription ? 'FIELD AGT' : 'CIVILIAN'
+  const clearance = user?.role === 'ADMIN'
+    ? 'DIRECTOR'
+    : user?.hasSubscription
+      ? (user.subscription?.plan?.includes('ANNUAL') ? 'STN CHIEF' : 'FIELD AGT')
+      : 'CIVILIAN'
 
   return (
     <header>

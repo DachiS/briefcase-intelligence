@@ -16,7 +16,8 @@ function operativeId(id: string) {
 
 function clearanceLabel(user: User) {
   if (user.role === 'ADMIN') return 'DIRECTOR'
-  return user.hasSubscription ? 'FIELD AGT' : 'ANALYST'
+  if (!user.hasSubscription) return 'ANALYST'
+  return user.subscription?.plan?.includes('ANNUAL') ? 'STN CHIEF' : 'FIELD AGT'
 }
 
 export default function DashboardPage() {
@@ -115,7 +116,7 @@ export default function DashboardPage() {
   const callSign = user.name.split(' ')[0].toUpperCase()
   const opId = operativeId(user.id)
   const clearance = clearanceLabel(user)
-  const clearanceLevel = user.role === 'ADMIN' ? 4 : user.hasSubscription ? 2 : 1
+  const clearanceLevel = user.role === 'ADMIN' ? 4 : user.hasSubscription ? (user.subscription?.plan?.includes('ANNUAL') ? 3 : 2) : 1
 
   return (
     <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>

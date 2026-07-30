@@ -2,6 +2,7 @@
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import SpyGlobe from '@/components/SpyGlobe'
+import TierCta, { type CtaTier } from '@/components/TierCta'
 import { PRICING, fmt, amountStr } from '@/lib/pricing'
 
 const articles = [
@@ -200,17 +201,17 @@ export default function HomePage() {
             {/* Analyst (free) */}
             <TierCard tier="ANALYST" price={amountStr(PRICING.analyst.amount)} period="forever" desc="Sample one declassified issue per quarter." highlight={false}
               features={[{ label: '1 sample issue per quarter' }, { label: 'Read in browser only' }, { label: 'Public archive index' }, { label: 'PDF download', locked: true }, { label: 'Full archive access', locked: true }]}
-              ctaLabel="Create Account" ctaHref="/register" sealColor="var(--paper-dim)" />
+              ctaTier="analyst" sealColor="var(--paper-dim)" />
 
             {/* Field Agent */}
             <TierCard tier="FIELD AGENT" price={amountStr(PRICING.fieldAgent.amount)} period="month" desc="Full active access. New issue every month, on the day it drops." highlight badge="MOST RECRUITED"
               features={[{ label: 'New issue every month' }, { label: 'Full archive · 12 months' }, { label: 'PDF download · offline' }, { label: 'Encrypted reader' }, { label: 'Cancel anytime' }]}
-              ctaLabel="Receive Brief" ctaHref="/clearance" sealColor="var(--red)" />
+              ctaTier="field" sealColor="var(--red)" />
 
             {/* Station Chief */}
-            <TierCard tier="STATION CHIEF" price={amountStr(PRICING.stationChief.amount)} period="year" desc="Lifetime archive. All declassified issues, plus locked Chief-only briefs." highlight={false}
+            <TierCard tier="STATION CHIEF" price={amountStr(PRICING.stationChief.amount)} period="year" desc="Full annual access. All declassified issues, plus locked Chief-only briefs." highlight={false}
               features={[{ label: 'Everything in Field Agent' }, { label: 'Complete archive · all issues' }, { label: 'Chief-only locked briefs' }, { label: 'Priority intelligence inbox' }, { label: 'Save 25% vs monthly' }]}
-              ctaLabel="Select Tier" ctaHref="/clearance?plan=annual" sealColor="var(--gold)" />
+              ctaTier="station" sealColor="var(--gold)" />
           </div>
 
           <div style={{ marginTop: 48, display: 'flex', justifyContent: 'center' }}>
@@ -248,10 +249,10 @@ export default function HomePage() {
   )
 }
 
-function TierCard({ tier, price, period, desc, features, highlight = false, badge, ctaLabel, ctaHref, sealColor }: {
+function TierCard({ tier, price, period, desc, features, highlight = false, badge, ctaTier, sealColor }: {
   tier: string; price: string; period: string; desc: string;
   features: { label: string; locked?: boolean }[];
-  highlight?: boolean; badge?: string; ctaLabel: string; ctaHref: string; sealColor: string;
+  highlight?: boolean; badge?: string; ctaTier: CtaTier; sealColor: string;
 }) {
   return (
     <div style={{ position: 'relative', paddingTop: badge ? 24 : 0 }}>
@@ -295,7 +296,7 @@ function TierCard({ tier, price, period, desc, features, highlight = false, badg
         ))}
 
         <div style={{ marginTop: 24 }}>
-          <Link href={ctaHref} className={highlight ? 'btn-primary' : 'btn-outline'} style={{ display: 'block', textAlign: 'center' }}>{ctaLabel}</Link>
+          <TierCta tier={ctaTier} highlight={highlight} />
         </div>
 
         <div style={{ position: 'absolute', bottom: 10, right: 14, fontFamily: 'var(--font-mono)', fontSize: '0.5rem', color: 'var(--paper-mute)', letterSpacing: '0.2em' }}>

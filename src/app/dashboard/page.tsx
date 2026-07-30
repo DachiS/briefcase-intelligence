@@ -22,23 +22,48 @@ function clearanceLabel(user: User) {
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [activating, setActivating] = useState(false)
   const [canceling, setCanceling] = useState(false)
   const router = useRouter()
   const { data: session, status } = useSession()
 
   useEffect(() => {
-    fetch('/api/auth/me')
-      .then(r => r.json())
-      .then(data => {
-        if (data?.user) { setUser(data.user); setLoading(false) }
-        else if (status === 'authenticated' && session?.user) {
+    let cancelled = false
+    // Set when Paddle redirects back after a successful checkout
+    // (successUrl = /dashboard?subscribed=true). The activating webhook is
+    // asynchronous, so we poll briefly until the subscription is recorded
+    // rather than immediately (and wrongly) showing the "subscribe" prompt.
+    const justSubscribed =
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('subscribed') === 'true'
+    let attempts = 0
+
+    const load = async () => {
+      try {
+        const data = await fetch('/api/auth/me').then(r => r.json())
+        if (cancelled) return
+        if (data?.user) {
+          setUser(data.user)
+          setLoading(false)
+          if (justSubscribed && !data.user.hasSubscription && attempts < 8) {
+            attempts++
+            setActivating(true)
+            setTimeout(load, 2500)
+          } else {
+            setActivating(false)
+          }
+        } else if (status === 'authenticated' && session?.user) {
           setUser({ id: (session.user as any).id || '', name: session.user.name || '', email: session.user.email || '', role: (session.user as any).role || 'SUBSCRIBER', hasSubscription: (session.user as any).hasSubscription || false, subscription: null })
           setLoading(false)
         } else if (status === 'unauthenticated') {
           router.push('/login?redirect=/dashboard')
         }
-      })
-      .catch(() => router.push('/login'))
+      } catch {
+        if (!cancelled) router.push('/login')
+      }
+    }
+    load()
+    return () => { cancelled = true }
   }, [router, session, status])
 
   const handleCancel = async () => {
@@ -115,7 +140,7 @@ export default function DashboardPage() {
                   ))}
                 </div>
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.55rem', color: 'var(--paper-dim)', letterSpacing: '0.18em' }}>
-                  {clearance} · {user.hasSubscription ? 'SUBSCRIBE TO UPGRADE →' : 'ACTIVE'}
+                  {clearance} · {user.hasSubscription ? 'ACTIVE' : 'SUBSCRIBE TO UPGRADE →'}
                 </div>
               </div>
 
@@ -136,8 +161,9 @@ export default function DashboardPage() {
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.55rem', letterSpacing: '0.28em', color: 'var(--paper-dim)', marginBottom: 14 }}>QUICK ACTIONS</div>
               {([
                 user.hasSubscription ? ['→', 'Browse current issues', '/issues'] : null,
-                !user.hasSubscription ? ['◆', 'Upgrade clearance', '/clearance'] : null,
-                ['→', 'Subscribe / manage plan', '/clearance'],
+                user.hasSubscription
+                  ? ['◆', 'Manage subscription', '#subscription-card']
+                  : ['◆', 'Subscribe / choose plan', '/clearance'],
               ].filter((x): x is string[] => x !== null)).map(([k, l, href], i, arr) => (
                 <Link key={l} href={href} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 0', borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none', textDecoration: 'none', color: 'inherit' }}>
                   <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--red)', fontSize: '0.85rem', width: 16 }}>{k}</span>
@@ -174,7 +200,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Subscription card */}
-            <div className="card-base tab-folder" style={{ padding: 24, marginTop: 28 }}>
+            <div id="subscription-card" className="card-base tab-folder" style={{ padding: 24, marginTop: 28, scrollMarginTop: 80 }}>
               <div className="tab">SUBSCRIPTION</div>
 
               {sub ? (
@@ -192,7 +218,7 @@ export default function DashboardPage() {
                   {[
                     ['Plan', sub.plan.toLowerCase()],
                     ['Status', sub.status],
-                    ['Renews', new Date(sub.currentPeriodEnd).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })],
+                    [sub.cancelAtPeriodEnd ? 'Access ends' : 'Renews', new Date(sub.currentPeriodEnd).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })],
                   ].map(([k, v]) => (
                     <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 0', borderBottom: '1px solid var(--border)' }}>
                       <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--paper-dim)', letterSpacing: '0.24em', textTransform: 'uppercase' }}>{k}</span>
@@ -212,6 +238,11 @@ export default function DashboardPage() {
                     )}
                   </div>
                 </>
+              ) : activating ? (
+                <div style={{ paddingTop: 8 }}>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--gold)', letterSpacing: '0.18em', marginBottom: 10 }}>● ACTIVATING CLEARANCE…</p>
+                  <p style={{ fontFamily: 'var(--font-body)', color: 'var(--paper-dim)', fontSize: '0.9rem', lineHeight: 1.6 }}>Payment received. Confirming your subscription — this usually takes a few seconds.</p>
+                </div>
               ) : (
                 <div style={{ paddingTop: 8 }}>
                   <p style={{ fontFamily: 'var(--font-body)', color: 'var(--paper-dim)', marginBottom: 20, fontSize: '0.9rem', lineHeight: 1.6 }}>No active subscription. Subscribe to access all declassified issues.</p>

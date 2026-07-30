@@ -26,6 +26,7 @@ export default function DashboardPage() {
   const [activating, setActivating] = useState(false)
   const [canceling, setCanceling] = useState(false)
   const [changing, setChanging] = useState(false)
+  const [resuming, setResuming] = useState(false)
   const router = useRouter()
   const { data: session, status } = useSession()
 
@@ -74,6 +75,21 @@ export default function DashboardPage() {
     const res = await fetch('/api/paddle/cancel', { method: 'POST' })
     if (res.ok) { const data = await fetch('/api/auth/me').then(r => r.json()); setUser(data.user) }
     setCanceling(false)
+  }
+
+  const handleResume = async () => {
+    setResuming(true)
+    try {
+      const res = await fetch('/api/paddle/resume', { method: 'POST' })
+      if (res.ok) {
+        const data = await fetch('/api/auth/me').then(r => r.json()); setUser(data.user)
+      } else {
+        const err = await res.json().catch(() => ({}))
+        alert(err.error || 'Could not resume subscription. Please try again.')
+      }
+    } finally {
+      setResuming(false)
+    }
   }
 
   const handleChangePlan = async (plan: 'monthly' | 'annual') => {
@@ -250,7 +266,12 @@ export default function DashboardPage() {
                   ))}
 
                   {sub.cancelAtPeriodEnd && (
-                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.55rem', color: 'var(--red)', opacity: 0.7, marginTop: 10, letterSpacing: '0.1em' }}>Cancels at period end. Access retained until renewal date.</p>
+                    <>
+                      <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.55rem', color: 'var(--red)', opacity: 0.7, marginTop: 10, letterSpacing: '0.1em' }}>Cancels at period end. Access retained until renewal date.</p>
+                      <button onClick={handleResume} disabled={resuming} className="btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 16 }}>
+                        {resuming ? 'PROCESSING…' : '↻ Resume subscription'}
+                      </button>
+                    </>
                   )}
 
                   {/* Upgrade to annual — only for an active (non-canceling) monthly plan */}

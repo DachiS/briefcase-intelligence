@@ -54,6 +54,6 @@ export default function TierCta({ tier, highlight }: { tier: CtaTier; highlight:
 
   // station (annual)
   if (subscribed && plan === 'ANNUAL') return current('Current Plan')
-  if (subscribed && plan === 'MONTHLY') return link('/dashboard', 'Manage Plan')
+  if (subscribed && plan === 'MONTHLY') return link('/dashboard#subscription-card', 'Upgrade to Annual')
   return link(loggedIn ? '/subscribe' : '/clearance?plan=annual', 'Select Tier')
 }

@@ -182,6 +182,14 @@ async function handleLifecycle(type: string, data: any) {
     if (data.status) update.status = statusFromPaddle(data.status)
     // Paddle signals a pending end-of-term cancel via scheduled_change.
     update.cancelAtPeriodEnd = data.scheduled_change?.action === 'cancel'
+    // Sync the plan when the subscription's price changed (e.g. a plan switch),
+    // so the local record doesn't keep the old plan/price after an upgrade.
+    const priceId: string | undefined = data.items?.[0]?.price?.id || data.items?.[0]?.price_id
+    const planKey = planFromPriceId(priceId)
+    if (planKey) {
+      update.plan = planKey === 'annual' ? 'ANNUAL' : 'MONTHLY'
+      update.stripePriceId = priceId
+    }
   }
 
   if (data.current_billing_period?.starts_at) {

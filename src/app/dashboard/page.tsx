@@ -24,6 +24,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [activating, setActivating] = useState(false)
   const [canceling, setCanceling] = useState(false)
+  const [changing, setChanging] = useState(false)
   const router = useRouter()
   const { data: session, status } = useSession()
 
@@ -72,6 +73,29 @@ export default function DashboardPage() {
     const res = await fetch('/api/paddle/cancel', { method: 'POST' })
     if (res.ok) { const data = await fetch('/api/auth/me').then(r => r.json()); setUser(data.user) }
     setCanceling(false)
+  }
+
+  const handleChangePlan = async (plan: 'monthly' | 'annual') => {
+    const msg = plan === 'annual'
+      ? 'Upgrade to the annual plan? You’ll be charged the prorated difference now and billed yearly going forward.'
+      : 'Switch to the monthly plan? Your billing changes to monthly, prorated from today.'
+    if (!confirm(msg)) return
+    setChanging(true)
+    try {
+      const res = await fetch('/api/paddle/change-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan }),
+      })
+      if (res.ok) {
+        const data = await fetch('/api/auth/me').then(r => r.json()); setUser(data.user)
+      } else {
+        const err = await res.json().catch(() => ({}))
+        alert(err.error || 'Could not change plan. Please try again.')
+      }
+    } finally {
+      setChanging(false)
+    }
   }
 
   if (loading) {
@@ -228,7 +252,19 @@ export default function DashboardPage() {
                     <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.55rem', color: 'var(--red)', opacity: 0.7, marginTop: 10, letterSpacing: '0.1em' }}>Cancels at period end. Access retained until renewal date.</p>
                   )}
 
-                  <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+                  {/* Upgrade to annual — only for an active (non-canceling) monthly plan */}
+                  {!sub.cancelAtPeriodEnd && !sub.plan.includes('ANNUAL') && (
+                    <button onClick={() => handleChangePlan('annual')} disabled={changing} className="btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 20 }}>
+                      {changing ? 'PROCESSING…' : '⬆ Upgrade to Annual — save 25%'}
+                    </button>
+                  )}
+
+                  <div style={{ display: 'flex', gap: 20, marginTop: 18, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {!sub.cancelAtPeriodEnd && sub.plan.includes('ANNUAL') && (
+                      <button onClick={() => handleChangePlan('monthly')} disabled={changing} style={{ background: 'none', border: 'none', fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--paper-dim)', cursor: 'pointer', letterSpacing: '0.15em', padding: 0, textTransform: 'uppercase' }}>
+                        {changing ? 'Processing...' : '↓ Switch to monthly'}
+                      </button>
+                    )}
                     {!sub.cancelAtPeriodEnd && (
                       <button onClick={handleCancel} disabled={canceling} style={{ background: 'none', border: 'none', fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--paper-dim)', cursor: 'pointer', letterSpacing: '0.15em', padding: 0, textTransform: 'uppercase' }}>
                         {canceling ? 'Processing...' : '× Cancel subscription'}

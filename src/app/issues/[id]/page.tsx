@@ -15,10 +15,9 @@ interface IssueInfo { id: string; title: string; issueNumber: number; publishedA
 // Two-page spread on wide screens (desktop/laptop), single page below.
 const SPREAD_MIN_WIDTH = 1024
 
-// One row of the continuous scroll: a single page, or a two-page spread. The
-// page(s) mount only when the row nears the viewport (and stay mounted), so a
-// long magazine doesn't rasterize every page up front. Rendering happens once —
-// after that, native scrolling is smooth (no per-turn re-rasterization).
+// One row of the continuous scroll: a single page, or a two-page spread.
+// Rendered once, then native scrolling moves through it (no per-turn
+// re-rasterization, which is what made discrete flipping lag).
 function ReaderRow({
   index, pages, width, dpr, gap, register,
 }: {
@@ -26,33 +25,20 @@ function ReaderRow({
   register: (i: number, el: HTMLDivElement | null) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
-  const [show, setShow] = useState(index < 2) // first spreads render eagerly
-  useEffect(() => {
-    register(index, ref.current)
-    if (show) return
-    const io = new IntersectionObserver(
-      ([e]) => { if (e.isIntersecting) { setShow(true); io.disconnect() } },
-      { rootMargin: '1400px 0px' },
-    )
-    if (ref.current) io.observe(ref.current)
-    return () => io.disconnect()
-  }, [index, show, register])
-
-  const estH = Math.round(width * 1.414) // A4-ish placeholder before render
+  useEffect(() => { register(index, ref.current) }, [index, register])
+  const estH = Math.round(width * 1.414)
   return (
     <div ref={ref} data-row-index={index} style={{ display: 'flex', gap, justifyContent: 'center', width: '100%' }}>
       {pages.map(p => (
-        <div key={p} style={{ boxShadow: '0 10px 40px rgba(0,0,0,0.55)', border: '1px solid var(--border)', background: '#0a0e14', width, minHeight: show ? undefined : estH }}>
-          {show && (
-            <Page
-              pageNumber={p}
-              width={width}
-              devicePixelRatio={dpr}
-              renderTextLayer={false}
-              renderAnnotationLayer={false}
-              loading={<div style={{ width, height: estH }} />}
-            />
-          )}
+        <div key={p} style={{ boxShadow: '0 10px 40px rgba(0,0,0,0.55)', border: '1px solid var(--border)', background: '#0a0e14', width }}>
+          <Page
+            pageNumber={p}
+            width={width}
+            devicePixelRatio={dpr}
+            renderTextLayer={false}
+            renderAnnotationLayer={false}
+            loading={<div style={{ width, height: estH }} />}
+          />
         </div>
       ))}
     </div>
@@ -116,19 +102,28 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
 
   const register = useCallback((i: number, el: HTMLDivElement | null) => { rowRefs.current[i] = el }, [])
 
-  // Update the page indicator from whichever row is most in view.
+  // Update the page indicator from scroll position (which row sits at the top
+  // third of the viewport). rAF-throttled; passive so it never blocks scrolling.
   useEffect(() => {
-    const root = bodyRef.current
-    if (!root || rows.length === 0) return
-    const io = new IntersectionObserver((entries) => {
-      let best = -1, bestRatio = 0
-      entries.forEach(e => {
-        if (e.intersectionRatio > bestRatio) { bestRatio = e.intersectionRatio; best = Number((e.target as HTMLElement).dataset.rowIndex) }
+    const el = bodyRef.current
+    if (!el || rows.length === 0) return
+    let raf = 0
+    const onScroll = () => {
+      if (raf) return
+      raf = requestAnimationFrame(() => {
+        raf = 0
+        const y = el.scrollTop + el.clientHeight * 0.3
+        let idx = 0
+        for (let i = 0; i < rows.length; i++) {
+          const r = rowRefs.current[i]
+          if (r && r.offsetTop <= y) idx = i; else break
+        }
+        setCurrentRow(idx)
       })
-      if (best >= 0 && bestRatio > 0.25) setCurrentRow(best)
-    }, { root, threshold: [0.25, 0.5, 0.75] })
-    rowRefs.current.slice(0, rows.length).forEach(el => el && io.observe(el))
-    return () => io.disconnect()
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
+    return () => { el.removeEventListener('scroll', onScroll); if (raf) cancelAnimationFrame(raf) }
   }, [rows])
 
   const scrollToRow = useCallback((idx: number) => {
@@ -210,7 +205,7 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
         background: 'linear-gradient(180deg, #050810 0%, #0a0e14 100%)',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: (loading || error) ? 'center' : 'flex-start',
-        gap: 16, padding: '24px 0 88px', scrollBehavior: 'smooth',
+        gap: 16, padding: '24px 0 88px',
       }}>
         {loading && <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--paper-dim)', letterSpacing: '0.2em' }}>DECRYPTING DOCUMENT…</p>}
 

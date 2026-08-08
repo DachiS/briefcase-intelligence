@@ -39,6 +39,15 @@ export async function getPDFReadUrl(key: string) {
   return getSignedUrl(s3Client, command, { expiresIn: 7200 })
 }
 
+// Fetch a PDF object's bytes server-side (for watermarking before delivery).
+export async function getPDFBuffer(key: string): Promise<Buffer> {
+  const command = new GetObjectCommand({ Bucket: BUCKET, Key: key })
+  const res = await s3Client.send(command)
+  if (!res.Body) throw new Error('S3 object has no body')
+  const bytes = await res.Body.transformToByteArray()
+  return Buffer.from(bytes)
+}
+
 // Delete an object
 export async function deleteS3Object(key: string) {
   const command = new DeleteObjectCommand({

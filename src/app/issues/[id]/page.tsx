@@ -173,7 +173,7 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
   }
 
   return (
-    <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
+    <main style={{ height: '100dvh', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
       <div className="classified-stripe">
         <span className="cs-dot" />{' '}
         READING · ISSUE №{num} · {title} · WATERMARK ACTIVE
@@ -206,7 +206,7 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
 
       {/* Reader body — continuous vertical scroll */}
       <div ref={bodyRef} style={{
-        flex: 1, position: 'relative', overflow: 'auto',
+        flex: 1, minHeight: 0, position: 'relative', overflow: 'auto',
         background: 'linear-gradient(180deg, #050810 0%, #0a0e14 100%)',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: (loading || error) ? 'center' : 'flex-start',

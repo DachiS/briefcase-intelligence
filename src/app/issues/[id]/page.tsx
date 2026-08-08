@@ -118,6 +118,10 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
   // pdf.js do a single full fetch (our endpoint returns the whole file).
   const file = useMemo(() => (pdfUrl ? { url: pdfUrl } : null), [pdfUrl])
   const pdfOptions = useMemo(() => ({ disableStream: true, disableRange: true }), [])
+  // Cap the render resolution — retina screens rasterize at devicePixelRatio 2
+  // (4× the pixels), which stalls the main thread on each page turn and makes
+  // flipping feel laggy. 1.5 keeps text crisp at fit-width while ~halving cost.
+  const dpr = useMemo(() => (typeof window !== 'undefined' ? Math.min(1.5, window.devicePixelRatio || 1) : 1), [])
   const onDocLoad = useCallback(({ numPages }: { numPages: number }) => setNumPages(numPages), [])
   const onDocError = useCallback(() => setError('This issue could not be rendered.'), [])
 
@@ -192,11 +196,11 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
           >
             <div style={{ display: 'flex', flexDirection: 'row', gap: spread ? 2 : 0, alignItems: 'flex-start' }}>
               <div style={pageFrame}>
-                <Page pageNumber={pageNum} width={pageWidth * scale} renderTextLayer={false} renderAnnotationLayer={false} />
+                <Page pageNumber={pageNum} width={pageWidth * scale} devicePixelRatio={dpr} renderTextLayer={false} renderAnnotationLayer={false} />
               </div>
               {spread && rightPage && (
                 <div style={pageFrame}>
-                  <Page pageNumber={rightPage} width={pageWidth * scale} renderTextLayer={false} renderAnnotationLayer={false} />
+                  <Page pageNumber={rightPage} width={pageWidth * scale} devicePixelRatio={dpr} renderTextLayer={false} renderAnnotationLayer={false} />
                 </div>
               )}
             </div>

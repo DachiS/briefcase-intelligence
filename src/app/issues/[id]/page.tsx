@@ -103,28 +103,23 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
   const register = useCallback((i: number, el: HTMLDivElement | null) => { rowRefs.current[i] = el }, [])
 
   // Update the page indicator from scroll position (which row sits at the top
-  // third of the viewport). rAF-throttled; passive so it never blocks scrolling.
-  useEffect(() => {
-    const el = bodyRef.current
-    if (!el || rows.length === 0) return
-    let raf = 0
-    const onScroll = () => {
-      if (raf) return
-      raf = requestAnimationFrame(() => {
-        raf = 0
-        const y = el.scrollTop + el.clientHeight * 0.3
-        let idx = 0
-        for (let i = 0; i < rows.length; i++) {
-          const r = rowRefs.current[i]
-          if (r && r.offsetTop <= y) idx = i; else break
-        }
-        setCurrentRow(idx)
-      })
-    }
-    el.addEventListener('scroll', onScroll, { passive: true })
-    onScroll()
-    return () => { el.removeEventListener('scroll', onScroll); if (raf) cancelAnimationFrame(raf) }
-  }, [rows])
+  // third of the viewport). rAF-throttled via React's onScroll on the body.
+  const scrollRaf = useRef(0)
+  const onBodyScroll = useCallback(() => {
+    if (scrollRaf.current) return
+    scrollRaf.current = requestAnimationFrame(() => {
+      scrollRaf.current = 0
+      const el = bodyRef.current
+      if (!el) return
+      const y = el.scrollTop + el.clientHeight * 0.3
+      let idx = 0
+      for (let i = 0; i < rowRefs.current.length; i++) {
+        const r = rowRefs.current[i]
+        if (r && r.offsetTop <= y) idx = i; else break
+      }
+      setCurrentRow(idx)
+    })
+  }, [])
 
   const scrollToRow = useCallback((idx: number) => {
     rowRefs.current[idx]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -200,7 +195,7 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
       </div>
 
       {/* Reader body — continuous vertical scroll */}
-      <div ref={bodyRef} style={{
+      <div ref={bodyRef} onScroll={onBodyScroll} style={{
         flex: 1, minHeight: 0, position: 'relative', overflow: 'auto',
         background: 'linear-gradient(180deg, #050810 0%, #0a0e14 100%)',
         display: 'flex', flexDirection: 'column', alignItems: 'center',

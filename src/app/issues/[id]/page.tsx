@@ -14,13 +14,17 @@ pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
 
 interface IssueInfo { id: string; title: string; issueNumber: number; publishedAt: string }
 
+// Two-page spread on wide screens (desktop/laptop), single page below this.
+const SPREAD_MIN_WIDTH = 1024
+
 export default function IssuePage({ params }: { params: Promise<{ id: string }> }) {
   const [issueId, setIssueId] = useState<string | null>(null)
   const [issue, setIssue] = useState<IssueInfo | null>(null)
   const [numPages, setNumPages] = useState(0)
-  const [pageNum, setPageNum] = useState(1)
+  const [pageNum, setPageNum] = useState(1) // in spread mode this is the LEFT page
   const [scale, setScale] = useState(1)
-  const [baseWidth, setBaseWidth] = useState(820)
+  const [spread, setSpread] = useState(false)
+  const [pageWidth, setPageWidth] = useState(700)
   const [fullscreen, setFullscreen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -29,7 +33,7 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
 
   useEffect(() => { params.then(({ id }) => setIssueId(id)) }, [params])
 
-  // Access gate + issue metadata (one request: /api/issues gates and returns meta).
+  // Access gate + issue metadata.
   useEffect(() => {
     if (!issueId) return
     fetch('/api/issues').then(async r => {
@@ -42,20 +46,29 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
     }).catch(() => { setError('Failed to load issue.'); setLoading(false) })
   }, [issueId, router])
 
-  // Responsive page width.
+  // Responsive: choose orientation (spread vs single) and page width by width.
   useEffect(() => {
     const update = () => {
       const w = bodyRef.current?.clientWidth ?? window.innerWidth
-      setBaseWidth(Math.min(Math.max(w - 48, 280), 900))
+      const useSpread = w >= SPREAD_MIN_WIDTH
+      setSpread(useSpread)
+      if (useSpread) {
+        // Two pages side by side (24px gap, 48px padding), capped so they don't balloon.
+        setPageWidth(Math.min(Math.floor((w - 48 - 24) / 2), 620))
+        // Left page of a spread is always odd (pages 1-2, 3-4, …).
+        setPageNum(p => (p % 2 === 0 ? p - 1 : p))
+      } else {
+        setPageWidth(Math.min(Math.max(w - 48, 280), 900))
+      }
     }
     update()
     window.addEventListener('resize', update)
     return () => window.removeEventListener('resize', update)
   }, [loading, fullscreen])
 
-  const go = useCallback((d: number) => {
-    setPageNum(p => Math.min(Math.max(1, p + d), numPages || 1))
-  }, [numPages])
+  const go = useCallback((dir: number) => {
+    setPageNum(p => Math.min(Math.max(1, p + dir * (spread ? 2 : 1)), numPages || 1))
+  }, [spread, numPages])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -69,12 +82,16 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
   const num = issue ? String(issue.issueNumber).padStart(3, '0') : '---'
   const title = issue?.title || 'CLASSIFIED'
   const pdfUrl = issueId ? `/api/issues/${issueId}/pdf` : null
+  const rightPage = pageNum + 1 <= numPages ? pageNum + 1 : null
+  const atStart = pageNum <= 1
+  const atEnd = spread ? pageNum + 1 >= numPages : pageNum >= numPages
 
   const ctrlBtn: React.CSSProperties = {
     background: 'none', border: '1px solid var(--border)', color: 'var(--paper-dim)',
     cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.15em',
     padding: '5px 10px', textTransform: 'uppercase',
   }
+  const pageFrame: React.CSSProperties = { boxShadow: '0 12px 48px rgba(0,0,0,0.6)', border: '1px solid var(--border)', background: '#fff' }
 
   return (
     <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
@@ -133,13 +150,15 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
             loading={<p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--paper-dim)', letterSpacing: '0.2em' }}>DECRYPTING DOCUMENT…</p>}
             error={<p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--red)' }}>⚠ Failed to render this issue.</p>}
           >
-            <div style={{ boxShadow: '0 12px 48px rgba(0,0,0,0.6)', border: '1px solid var(--border)' }}>
-              <Page
-                pageNumber={pageNum}
-                width={baseWidth * scale}
-                renderTextLayer={false}
-                renderAnnotationLayer={false}
-              />
+            <div style={{ display: 'flex', flexDirection: 'row', gap: spread ? 2 : 0, alignItems: 'flex-start' }}>
+              <div style={pageFrame}>
+                <Page pageNumber={pageNum} width={pageWidth * scale} renderTextLayer={false} renderAnnotationLayer={false} />
+              </div>
+              {spread && rightPage && (
+                <div style={pageFrame}>
+                  <Page pageNumber={rightPage} width={pageWidth * scale} renderTextLayer={false} renderAnnotationLayer={false} />
+                </div>
+              )}
             </div>
           </Document>
         )}
@@ -151,11 +170,11 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
           position: 'sticky', bottom: 0, background: 'var(--bg-deep)', borderTop: '1px solid var(--border)',
           padding: '10px 24px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 20,
         }}>
-          <button style={{ ...ctrlBtn, opacity: pageNum <= 1 ? 0.4 : 1 }} disabled={pageNum <= 1} onClick={() => go(-1)}>◀ Prev</button>
+          <button style={{ ...ctrlBtn, opacity: atStart ? 0.4 : 1 }} disabled={atStart} onClick={() => go(-1)}>◀ Prev</button>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', letterSpacing: '0.2em', color: 'var(--paper)' }}>
-            PAGE {pageNum} / {numPages}
+            {spread && rightPage ? `PAGES ${pageNum}–${rightPage}` : `PAGE ${pageNum}`} / {numPages}
           </span>
-          <button style={{ ...ctrlBtn, opacity: pageNum >= numPages ? 0.4 : 1 }} disabled={pageNum >= numPages} onClick={() => go(1)}>Next ▶</button>
+          <button style={{ ...ctrlBtn, opacity: atEnd ? 0.4 : 1 }} disabled={atEnd} onClick={() => go(1)}>Next ▶</button>
         </div>
       )}
     </main>

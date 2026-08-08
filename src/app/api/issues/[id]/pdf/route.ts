@@ -19,6 +19,23 @@ function operativeId(id: string) {
   return '0x' + id.slice(0, 3).toUpperCase() + '-' + id.slice(-3).toUpperCase()
 }
 
+// Small per-instance cache of the RAW (un-watermarked) issue bytes keyed by the
+// S3 key, so repeat opens skip the slow S3 round-trip. Shared across users (the
+// per-user watermark is applied after, on every request), so memory stays to
+// one copy per issue. Bounded by count + TTL.
+const RAW_TTL_MS = 10 * 60 * 1000
+const RAW_MAX = 8
+const rawCache = new Map<string, { bytes: Buffer; exp: number }>()
+
+async function getRawPdf(key: string, fetchFn: (k: string) => Promise<Buffer>): Promise<Buffer> {
+  const hit = rawCache.get(key)
+  if (hit && hit.exp > Date.now()) return hit.bytes
+  const bytes = await fetchFn(key)
+  rawCache.set(key, { bytes, exp: Date.now() + RAW_TTL_MS })
+  if (rawCache.size > RAW_MAX) rawCache.delete(rawCache.keys().next().value as string)
+  return bytes
+}
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
@@ -32,7 +49,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const issue = await prisma.issue.findUnique({ where: { id, isPublished: true } })
     if (!issue) return NextResponse.json({ error: 'Issue not found' }, { status: 404 })
 
-    const raw = await getPDFBuffer(issue.pdfKey)
+    const raw = await getRawPdf(issue.pdfKey, getPDFBuffer)
     const pdf = await PDFDocument.load(raw, { updateMetadata: false })
     const font = await pdf.embedFont(StandardFonts.Helvetica)
 

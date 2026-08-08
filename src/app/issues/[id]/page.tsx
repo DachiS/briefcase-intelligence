@@ -1,6 +1,6 @@
 // src/app/issues/[id]/page.tsx
 'use client'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
@@ -30,7 +30,7 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
   const [error, setError] = useState('')
   const router = useRouter()
   const bodyRef = useRef<HTMLDivElement>(null)
-  const wheelLock = useRef(false)
+  const wheelLock = useRef(0) // timestamp of last wheel event (gesture detection)
 
   useEffect(() => { params.then(({ id }) => setIssueId(id)) }, [params])
 
@@ -82,8 +82,10 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
 
   // Touchpad / wheel turns pages. If the page is taller than the viewport
   // (zoomed in), scrolling pans it first and only flips at the top/bottom edge;
-  // when the page fits, any scroll flips. A short lock prevents one flick from
-  // turning several pages at once.
+  // when the page fits, a scroll flips. Crucially, it flips ONCE per deliberate
+  // gesture: a touchpad flick emits a long stream of momentum events, so we only
+  // act on the first event of a gesture (events >150ms apart) and ignore the
+  // momentum tail — otherwise one swipe cascades into many flips (the lag).
   useEffect(() => {
     const el = bodyRef.current
     if (!el || loading || error) return
@@ -92,20 +94,16 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
       const canScrollDown = el.scrollTop + el.clientHeight < el.scrollHeight - 2
       const canScrollUp = el.scrollTop > 2
       const flipping = (e.deltaY > 0 && !canScrollDown) || (e.deltaY < 0 && !canScrollUp)
+      const now = e.timeStamp
+      const gap = now - wheelLock.current
+      wheelLock.current = now
       if (!flipping) return // let native scroll pan a tall page
       e.preventDefault()
-      if (wheelLock.current) return
+      if (gap < 150) return // momentum tail of the same gesture — ignore
       const isEnd = spread ? pageNum + 1 >= numPages : pageNum >= numPages
       const isStart = pageNum <= 1
-      if (e.deltaY > 0 && !isEnd) {
-        wheelLock.current = true
-        go(1); el.scrollTop = 0
-        setTimeout(() => { wheelLock.current = false }, 500)
-      } else if (e.deltaY < 0 && !isStart) {
-        wheelLock.current = true
-        go(-1); el.scrollTop = 0
-        setTimeout(() => { wheelLock.current = false }, 500)
-      }
+      if (e.deltaY > 0 && !isEnd) { go(1); el.scrollTop = 0 }
+      else if (e.deltaY < 0 && !isStart) { go(-1); el.scrollTop = 0 }
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
@@ -114,6 +112,15 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
   const num = issue ? String(issue.issueNumber).padStart(3, '0') : '---'
   const title = issue?.title || 'CLASSIFIED'
   const pdfUrl = issueId ? `/api/issues/${issueId}/pdf` : null
+
+  // Memoize what react-pdf keys on so the document loads exactly ONCE and page
+  // turns/zoom don't reload or re-parse it. disableStream/disableRange make
+  // pdf.js do a single full fetch (our endpoint returns the whole file).
+  const file = useMemo(() => (pdfUrl ? { url: pdfUrl } : null), [pdfUrl])
+  const pdfOptions = useMemo(() => ({ disableStream: true, disableRange: true }), [])
+  const onDocLoad = useCallback(({ numPages }: { numPages: number }) => setNumPages(numPages), [])
+  const onDocError = useCallback(() => setError('This issue could not be rendered.'), [])
+
   const rightPage = pageNum + 1 <= numPages ? pageNum + 1 : null
   const atStart = pageNum <= 1
   const atEnd = spread ? pageNum + 1 >= numPages : pageNum >= numPages
@@ -176,9 +183,10 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
 
         {!loading && !error && pdfUrl && (
           <Document
-            file={pdfUrl}
-            onLoadSuccess={({ numPages }) => setNumPages(numPages)}
-            onLoadError={() => setError('This issue could not be rendered.')}
+            file={file}
+            options={pdfOptions}
+            onLoadSuccess={onDocLoad}
+            onLoadError={onDocError}
             loading={<p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--paper-dim)', letterSpacing: '0.2em' }}>DECRYPTING DOCUMENT…</p>}
             error={<p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--red)' }}>⚠ Failed to render this issue.</p>}
           >

@@ -6,31 +6,73 @@ import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import { Document, Page, pdfjs } from 'react-pdf'
 
-// Serve the pdf.js worker from /public at a fixed path. The bundler-resolved
-// URL (new URL(..., import.meta.url)) is unreliable in the Next App Router and
-// can leave pdf.js rendering on the main thread (freezing the tab). Must match
-// the pdfjs-dist version react-pdf depends on (copied from node_modules).
+// Serve the pdf.js worker from /public at a fixed path (the bundler-resolved URL
+// is unreliable in the App Router). Must match the pdfjs-dist version.
 pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
 
 interface IssueInfo { id: string; title: string; issueNumber: number; publishedAt: string }
 
-// Two-page spread on wide screens (desktop/laptop), single page below this.
+// Two-page spread on wide screens (desktop/laptop), single page below.
 const SPREAD_MIN_WIDTH = 1024
+
+// One row of the continuous scroll: a single page, or a two-page spread. The
+// page(s) mount only when the row nears the viewport (and stay mounted), so a
+// long magazine doesn't rasterize every page up front. Rendering happens once —
+// after that, native scrolling is smooth (no per-turn re-rasterization).
+function ReaderRow({
+  index, pages, width, dpr, gap, register,
+}: {
+  index: number; pages: number[]; width: number; dpr: number; gap: number
+  register: (i: number, el: HTMLDivElement | null) => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [show, setShow] = useState(index < 2) // first spreads render eagerly
+  useEffect(() => {
+    register(index, ref.current)
+    if (show) return
+    const io = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) { setShow(true); io.disconnect() } },
+      { rootMargin: '1400px 0px' },
+    )
+    if (ref.current) io.observe(ref.current)
+    return () => io.disconnect()
+  }, [index, show, register])
+
+  const estH = Math.round(width * 1.414) // A4-ish placeholder before render
+  return (
+    <div ref={ref} data-row-index={index} style={{ display: 'flex', gap, justifyContent: 'center', width: '100%' }}>
+      {pages.map(p => (
+        <div key={p} style={{ boxShadow: '0 10px 40px rgba(0,0,0,0.55)', border: '1px solid var(--border)', background: '#0a0e14', width, minHeight: show ? undefined : estH }}>
+          {show && (
+            <Page
+              pageNumber={p}
+              width={width}
+              devicePixelRatio={dpr}
+              renderTextLayer={false}
+              renderAnnotationLayer={false}
+              loading={<div style={{ width, height: estH }} />}
+            />
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export default function IssuePage({ params }: { params: Promise<{ id: string }> }) {
   const [issueId, setIssueId] = useState<string | null>(null)
   const [issue, setIssue] = useState<IssueInfo | null>(null)
   const [numPages, setNumPages] = useState(0)
-  const [pageNum, setPageNum] = useState(1) // in spread mode this is the LEFT page
   const [scale, setScale] = useState(1)
   const [spread, setSpread] = useState(false)
   const [pageWidth, setPageWidth] = useState(700)
   const [fullscreen, setFullscreen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [currentRow, setCurrentRow] = useState(0)
   const router = useRouter()
   const bodyRef = useRef<HTMLDivElement>(null)
-  const wheelLock = useRef(0) // timestamp of last wheel event (gesture detection)
+  const rowRefs = useRef<(HTMLDivElement | null)[]>([])
 
   useEffect(() => { params.then(({ id }) => setIssueId(id)) }, [params])
 
@@ -47,94 +89,88 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
     }).catch(() => { setError('Failed to load issue.'); setLoading(false) })
   }, [issueId, router])
 
-  // Responsive: choose orientation (spread vs single) and page width by width.
+  // Responsive: spread vs single, and page width.
   useEffect(() => {
     const update = () => {
       const w = bodyRef.current?.clientWidth ?? window.innerWidth
       const useSpread = w >= SPREAD_MIN_WIDTH
       setSpread(useSpread)
-      if (useSpread) {
-        // Two pages side by side (24px gap, 48px padding), capped so they don't balloon.
-        setPageWidth(Math.min(Math.floor((w - 48 - 24) / 2), 620))
-        // Left page of a spread is always odd (pages 1-2, 3-4, …).
-        setPageNum(p => (p % 2 === 0 ? p - 1 : p))
-      } else {
-        setPageWidth(Math.min(Math.max(w - 48, 280), 900))
-      }
+      setPageWidth(useSpread
+        ? Math.min(Math.floor((w - 48 - 24) / 2), 620)
+        : Math.min(Math.max(w - 48, 280), 900))
     }
     update()
     window.addEventListener('resize', update)
     return () => window.removeEventListener('resize', update)
   }, [loading, fullscreen])
 
+  // Group pages into rows (spread = pairs, single = one page each).
+  const rows = useMemo(() => {
+    const out: number[][] = []
+    const per = spread ? 2 : 1
+    for (let p = 1; p <= numPages; p += per) {
+      out.push(per === 2 && p + 1 <= numPages ? [p, p + 1] : [p])
+    }
+    return out
+  }, [numPages, spread])
+
+  const register = useCallback((i: number, el: HTMLDivElement | null) => { rowRefs.current[i] = el }, [])
+
+  // Update the page indicator from whichever row is most in view.
+  useEffect(() => {
+    const root = bodyRef.current
+    if (!root || rows.length === 0) return
+    const io = new IntersectionObserver((entries) => {
+      let best = -1, bestRatio = 0
+      entries.forEach(e => {
+        if (e.intersectionRatio > bestRatio) { bestRatio = e.intersectionRatio; best = Number((e.target as HTMLElement).dataset.rowIndex) }
+      })
+      if (best >= 0 && bestRatio > 0.25) setCurrentRow(best)
+    }, { root, threshold: [0.25, 0.5, 0.75] })
+    rowRefs.current.slice(0, rows.length).forEach(el => el && io.observe(el))
+    return () => io.disconnect()
+  }, [rows])
+
+  const scrollToRow = useCallback((idx: number) => {
+    rowRefs.current[idx]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [])
+
   const go = useCallback((dir: number) => {
-    setPageNum(p => Math.min(Math.max(1, p + dir * (spread ? 2 : 1)), numPages || 1))
-  }, [spread, numPages])
+    setCurrentRow(c => {
+      const n = Math.min(Math.max(0, c + dir), Math.max(0, rows.length - 1))
+      scrollToRow(n)
+      return n
+    })
+  }, [rows.length, scrollToRow])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight') go(1)
-      if (e.key === 'ArrowLeft') go(-1)
+      if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); go(1) }
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(-1) }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [go])
 
-  // Touchpad / wheel turns pages. If the page is taller than the viewport
-  // (zoomed in), scrolling pans it first and only flips at the top/bottom edge;
-  // when the page fits, a scroll flips. Crucially, it flips ONCE per deliberate
-  // gesture: a touchpad flick emits a long stream of momentum events, so we only
-  // act on the first event of a gesture (events >150ms apart) and ignore the
-  // momentum tail — otherwise one swipe cascades into many flips (the lag).
-  useEffect(() => {
-    const el = bodyRef.current
-    if (!el || loading || error) return
-    const onWheel = (e: WheelEvent) => {
-      if (Math.abs(e.deltaY) < 4) return
-      const canScrollDown = el.scrollTop + el.clientHeight < el.scrollHeight - 2
-      const canScrollUp = el.scrollTop > 2
-      const flipping = (e.deltaY > 0 && !canScrollDown) || (e.deltaY < 0 && !canScrollUp)
-      const now = performance.now()
-      const gap = now - wheelLock.current
-      wheelLock.current = now
-      if (!flipping) return // let native scroll pan a tall page
-      e.preventDefault()
-      if (gap < 150) return // momentum tail of the same gesture — ignore
-      const isEnd = spread ? pageNum + 1 >= numPages : pageNum >= numPages
-      const isStart = pageNum <= 1
-      if (e.deltaY > 0 && !isEnd) { go(1); el.scrollTop = 0 }
-      else if (e.deltaY < 0 && !isStart) { go(-1); el.scrollTop = 0 }
-    }
-    el.addEventListener('wheel', onWheel, { passive: false })
-    return () => el.removeEventListener('wheel', onWheel)
-  }, [loading, error, pageNum, numPages, spread, go])
-
   const num = issue ? String(issue.issueNumber).padStart(3, '0') : '---'
   const title = issue?.title || 'CLASSIFIED'
   const pdfUrl = issueId ? `/api/issues/${issueId}/pdf` : null
-
-  // Memoize what react-pdf keys on so the document loads exactly ONCE and page
-  // turns/zoom don't reload or re-parse it. disableStream/disableRange make
-  // pdf.js do a single full fetch (our endpoint returns the whole file).
   const file = useMemo(() => (pdfUrl ? { url: pdfUrl } : null), [pdfUrl])
   const pdfOptions = useMemo(() => ({ disableStream: true, disableRange: true }), [])
-  // Cap the render resolution — retina screens rasterize at devicePixelRatio 2
-  // (4× the pixels), which stalls the main thread on each page turn and makes
-  // flipping feel laggy. 1.5 keeps text crisp at fit-width while ~halving cost.
   const dpr = useMemo(() => (typeof window !== 'undefined' ? Math.min(1.5, window.devicePixelRatio || 1) : 1), [])
   const onDocLoad = useCallback(({ numPages }: { numPages: number }) => setNumPages(numPages), [])
   const onDocError = useCallback(() => setError('This issue could not be rendered.'), [])
 
-  const rightPage = pageNum + 1 <= numPages ? pageNum + 1 : null
-  const atStart = pageNum <= 1
-  const atEnd = spread ? pageNum + 1 >= numPages : pageNum >= numPages
+  const curPages = rows[currentRow] || []
+  const first = curPages[0], last = curPages[curPages.length - 1]
+  const atStart = currentRow <= 0
+  const atEnd = currentRow >= rows.length - 1
 
   const ctrlBtn: React.CSSProperties = {
     background: 'none', border: '1px solid var(--border)', color: 'var(--paper-dim)',
     cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.15em',
     padding: '5px 10px', textTransform: 'uppercase',
   }
-  const pageFrame: React.CSSProperties = { boxShadow: '0 12px 48px rgba(0,0,0,0.6)', border: '1px solid var(--border)', background: '#fff' }
 
   return (
     <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
@@ -168,13 +204,13 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
         </div>
       </div>
 
-      {/* Reader body */}
+      {/* Reader body — continuous vertical scroll */}
       <div ref={bodyRef} style={{
         flex: 1, position: 'relative', overflow: 'auto',
         background: 'linear-gradient(180deg, #050810 0%, #0a0e14 100%)',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: (loading || error) ? 'center' : 'flex-start',
-        padding: '24px 0 88px',
+        gap: 16, padding: '24px 0 88px', scrollBehavior: 'smooth',
       }}>
         {loading && <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--paper-dim)', letterSpacing: '0.2em' }}>DECRYPTING DOCUMENT…</p>}
 
@@ -185,7 +221,7 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
           </div>
         )}
 
-        {!loading && !error && pdfUrl && (
+        {!loading && !error && file && (
           <Document
             file={file}
             options={pdfOptions}
@@ -194,21 +230,16 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
             loading={<p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--paper-dim)', letterSpacing: '0.2em' }}>DECRYPTING DOCUMENT…</p>}
             error={<p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--red)' }}>⚠ Failed to render this issue.</p>}
           >
-            <div style={{ display: 'flex', flexDirection: 'row', gap: spread ? 2 : 0, alignItems: 'flex-start' }}>
-              <div style={pageFrame}>
-                <Page pageNumber={pageNum} width={pageWidth * scale} devicePixelRatio={dpr} renderTextLayer={false} renderAnnotationLayer={false} />
-              </div>
-              {spread && rightPage && (
-                <div style={pageFrame}>
-                  <Page pageNumber={rightPage} width={pageWidth * scale} devicePixelRatio={dpr} renderTextLayer={false} renderAnnotationLayer={false} />
-                </div>
-              )}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, width: '100%' }}>
+              {rows.map((row, i) => (
+                <ReaderRow key={i} index={i} pages={row} width={pageWidth * scale} dpr={dpr} gap={spread ? 2 : 0} register={register} />
+              ))}
             </div>
           </Document>
         )}
       </div>
 
-      {/* Page navigation bar */}
+      {/* Page navigation bar (jumps the scroll to the prev/next spread) */}
       {!loading && !error && numPages > 0 && (
         <div style={{
           position: 'sticky', bottom: 0, background: 'var(--bg-deep)', borderTop: '1px solid var(--border)',
@@ -216,7 +247,7 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
         }}>
           <button style={{ ...ctrlBtn, opacity: atStart ? 0.4 : 1 }} disabled={atStart} onClick={() => go(-1)}>◀ Prev</button>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', letterSpacing: '0.2em', color: 'var(--paper)' }}>
-            {spread && rightPage ? `PAGES ${pageNum}–${rightPage}` : `PAGE ${pageNum}`} / {numPages}
+            {first && last && last !== first ? `PAGES ${first}–${last}` : `PAGE ${first || 1}`} / {numPages}
           </span>
           <button style={{ ...ctrlBtn, opacity: atEnd ? 0.4 : 1 }} disabled={atEnd} onClick={() => go(1)}>Next ▶</button>
         </div>

@@ -94,7 +94,7 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
       const canScrollDown = el.scrollTop + el.clientHeight < el.scrollHeight - 2
       const canScrollUp = el.scrollTop > 2
       const flipping = (e.deltaY > 0 && !canScrollDown) || (e.deltaY < 0 && !canScrollUp)
-      const now = e.timeStamp
+      const now = performance.now()
       const gap = now - wheelLock.current
       wheelLock.current = now
       if (!flipping) return // let native scroll pan a tall page

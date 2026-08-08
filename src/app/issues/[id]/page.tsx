@@ -30,6 +30,7 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
   const [error, setError] = useState('')
   const router = useRouter()
   const bodyRef = useRef<HTMLDivElement>(null)
+  const wheelLock = useRef(false)
 
   useEffect(() => { params.then(({ id }) => setIssueId(id)) }, [params])
 
@@ -78,6 +79,37 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [go])
+
+  // Touchpad / wheel turns pages. If the page is taller than the viewport
+  // (zoomed in), scrolling pans it first and only flips at the top/bottom edge;
+  // when the page fits, any scroll flips. A short lock prevents one flick from
+  // turning several pages at once.
+  useEffect(() => {
+    const el = bodyRef.current
+    if (!el || loading || error) return
+    const onWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) < 4) return
+      const canScrollDown = el.scrollTop + el.clientHeight < el.scrollHeight - 2
+      const canScrollUp = el.scrollTop > 2
+      const flipping = (e.deltaY > 0 && !canScrollDown) || (e.deltaY < 0 && !canScrollUp)
+      if (!flipping) return // let native scroll pan a tall page
+      e.preventDefault()
+      if (wheelLock.current) return
+      const isEnd = spread ? pageNum + 1 >= numPages : pageNum >= numPages
+      const isStart = pageNum <= 1
+      if (e.deltaY > 0 && !isEnd) {
+        wheelLock.current = true
+        go(1); el.scrollTop = 0
+        setTimeout(() => { wheelLock.current = false }, 500)
+      } else if (e.deltaY < 0 && !isStart) {
+        wheelLock.current = true
+        go(-1); el.scrollTop = 0
+        setTimeout(() => { wheelLock.current = false }, 500)
+      }
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [loading, error, pageNum, numPages, spread, go])
 
   const num = issue ? String(issue.issueNumber).padStart(3, '0') : '---'
   const title = issue?.title || 'CLASSIFIED'

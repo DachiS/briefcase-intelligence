@@ -6,11 +6,11 @@ import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import { Document, Page, pdfjs } from 'react-pdf'
 
-// Bundle the pdf.js worker (Turbopack/Next resolves this URL at build time).
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url,
-).toString()
+// Serve the pdf.js worker from /public at a fixed path. The bundler-resolved
+// URL (new URL(..., import.meta.url)) is unreliable in the Next App Router and
+// can leave pdf.js rendering on the main thread (freezing the tab). Must match
+// the pdfjs-dist version react-pdf depends on (copied from node_modules).
+pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
 
 interface IssueInfo { id: string; title: string; issueNumber: number; publishedAt: string }
 

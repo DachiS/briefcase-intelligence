@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic'
 // live/sandbox Paddle account before going to production.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyPaddleWebhook, PLANS } from '@/lib/paddle'
+import { verifyPaddleWebhook, PLANS, paddleRequest } from '@/lib/paddle'
 import { PRICING } from '@/lib/pricing'
 import { sendWelcomeEmail } from '@/lib/email'
 import { prisma } from '@/lib/prisma'
@@ -74,14 +74,27 @@ type ResolvedUser = { id: string; email: string; name: string }
 // callers (activation reuses it for the welcome email) to avoid re-querying.
 //
 // SECURITY (#4): custom_data is set in the browser (subscribe/page.tsx) and is
-// fully attacker-controlled — a tampered checkout could point custom.userId /
-// custom.email at someone else's account. So we prefer Paddle's OWN verified
-// customer email (the email the payment was actually made with) and never trust
-// a client-supplied userId. custom.email is only a last-resort fallback for
-// events where Paddle doesn't inline the customer email.
+// fully attacker-controlled — a tampered checkout could point custom.email at
+// someone else's account. So we resolve the owner from Paddle's OWN verified
+// customer record: look up the customer_id (which the buyer cannot forge) via
+// the API to get the authoritative email. Only if that lookup is unavailable do
+// we fall back to the event's inline customer email, then to custom_data.
 async function resolveUser(data: any): Promise<ResolvedUser | null> {
   const custom = data.custom_data || {}
-  const email: string | undefined = data.customer?.email || custom.email
+
+  let verifiedEmail: string | undefined
+  const customerId: string | undefined = data.customer_id || data.customer?.id
+  if (customerId) {
+    try {
+      const res = await paddleRequest(`/customers/${customerId}`, 'GET')
+      verifiedEmail = res?.data?.email
+    } catch (e) {
+      // Non-fatal: fall back to the event's email fields below.
+      console.error('Paddle customer lookup failed; falling back to event email', e)
+    }
+  }
+
+  const email: string | undefined = verifiedEmail || data.customer?.email || custom.email
   if (!email) return null
   return prisma.user.findUnique({
     where: { email: String(email).toLowerCase() },

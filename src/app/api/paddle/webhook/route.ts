@@ -94,12 +94,23 @@ async function resolveUser(data: any): Promise<ResolvedUser | null> {
     }
   }
 
-  const email: string | undefined = verifiedEmail || data.customer?.email || custom.email
-  if (!email) return null
-  return prisma.user.findUnique({
-    where: { email: String(email).toLowerCase() },
-    select: { id: true, email: true, name: true },
-  })
+  // Try each candidate email in trust order and return the FIRST that maps to a
+  // real user. The Paddle-verified email is preferred (unforgeable), but if the
+  // buyer's Paddle customer record holds a different address than their account
+  // (they edited it at checkout, or reused an existing Paddle customer), that
+  // lookup finds nobody — so we must still fall back to the event's inline email
+  // and custom_data.email rather than dropping a paid subscription on the floor.
+  const candidates = [verifiedEmail, data.customer?.email, custom.email]
+    .filter((e): e is string => !!e)
+    .map(e => e.toLowerCase())
+  for (const email of [...new Set(candidates)]) {
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, email: true, name: true },
+    })
+    if (user) return user
+  }
+  return null
 }
 
 // Activation: create or update the record to ACTIVE for the purchased plan.

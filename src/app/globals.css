@@ -112,6 +112,15 @@ h1, h2, h3, h4 {
 }
 @keyframes blink { 50% { opacity: 0.2; } }
 
+/* Horizontal PDF reader strip: pages snap like a carousel; hide the bar. */
+.reader-strip { scrollbar-width: none; }
+.reader-strip::-webkit-scrollbar { display: none; }
+
+/* Fullscreen reader: control bars fade out so pages get the whole screen;
+   moving the pointer over their edge brings them back. */
+.reader-overlay-bar { opacity: 0; transition: opacity 0.25s ease; }
+.reader-overlay-bar:hover, .reader-overlay-bar:focus-within { opacity: 1; }
+
 .opsec-bar {
   display: flex;
   align-items: stretch;

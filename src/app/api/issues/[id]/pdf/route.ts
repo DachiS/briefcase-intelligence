@@ -11,13 +11,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { getPDFBuffer } from '@/lib/s3'
+import { operativeId } from '@/lib/identity'
 import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib'
-
-// Same derivation the dashboard/navbar use, so the watermark matches the
-// operative ID shown to the user and maps back to their account.
-function operativeId(id: string) {
-  return '0x' + id.slice(0, 3).toUpperCase() + '-' + id.slice(-3).toUpperCase()
-}
 
 // Small per-instance cache of the RAW (un-watermarked) issue bytes keyed by the
 // S3 key, so repeat opens skip the slow S3 round-trip. Shared across users (the

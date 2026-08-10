@@ -59,3 +59,12 @@ export const amountStr = (a: number) => (a === 0 ? '0' : a.toFixed(2))
 // Pre-formatted convenience strings used in legal/marketing copy.
 export const FIELD_AGENT_MONTHLY = fmt(PRICING.fieldAgent.amount) // "$9.99"
 export const STATION_CHIEF_ANNUAL = fmt(PRICING.stationChief.amount) // "$89.99"
+
+/**
+ * Whole-number % saved by paying annually vs. 12× the monthly price. Derived
+ * from the amounts above so marketing copy ("save N%") never drifts from the
+ * real prices — never hardcode this figure. Currently ~25% (119.88 → 89.99).
+ */
+export const ANNUAL_SAVINGS_PCT = Math.round(
+  (1 - PRICING.stationChief.amount / (PRICING.fieldAgent.amount * 12)) * 100
+)

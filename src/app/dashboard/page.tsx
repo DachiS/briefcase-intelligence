@@ -4,15 +4,12 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Navbar from '@/components/Navbar'
-import { FIELD_AGENT_MONTHLY, STATION_CHIEF_ANNUAL } from '@/lib/pricing'
+import { FIELD_AGENT_MONTHLY, STATION_CHIEF_ANNUAL, ANNUAL_SAVINGS_PCT } from '@/lib/pricing'
+import { operativeId } from '@/lib/identity'
 
 interface User {
   id: string; name: string; email: string; role: string; hasSubscription: boolean
   subscription: { plan: string; status: string; currentPeriodEnd: string; cancelAtPeriodEnd: boolean } | null
-}
-
-function operativeId(id: string) {
-  return '0x' + id.slice(0, 3).toUpperCase() + '-' + id.slice(-3).toUpperCase()
 }
 
 function clearanceLabel(user: User) {
@@ -294,7 +291,7 @@ export default function DashboardPage() {
                   {/* Upgrade to annual — only for an active (non-canceling) monthly plan */}
                   {!sub.cancelAtPeriodEnd && !sub.plan.includes('ANNUAL') && (
                     <button onClick={() => handleChangePlan('annual')} disabled={changing} className="btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 20 }}>
-                      {changing ? 'PROCESSING…' : '⬆ Upgrade to Annual — save 25%'}
+                      {changing ? 'PROCESSING…' : `⬆ Upgrade to Annual — save ${ANNUAL_SAVINGS_PCT}%`}
                     </button>
                   )}
 

@@ -29,12 +29,23 @@ export async function POST() {
       return NextResponse.json({ ok: true })
     }
 
-    if (sub.stripeSubscriptionId?.startsWith('sub_')) {
-      // Clearing scheduled_change removes the pending cancellation in Paddle.
-      await paddleRequest(`/subscriptions/${sub.stripeSubscriptionId}`, 'PATCH', {
-        scheduled_change: null,
-      })
+    // We can only actually undo the cancellation upstream when we hold a real
+    // Paddle subscription id. Some rows carry a placeholder id (minted when the
+    // activation webhook arrived without one) — for those we CANNOT reach Paddle,
+    // so clearing cancelAtPeriodEnd locally would tell the user "renewing" while
+    // Paddle still cancels at period end. Refuse instead of lying.
+    if (!sub.stripeSubscriptionId?.startsWith('sub_')) {
+      return NextResponse.json(
+        { error: 'This subscription can’t be resumed automatically. Please contact support.' },
+        { status: 409 }
+      )
     }
+
+    // Clearing scheduled_change removes the pending cancellation in Paddle.
+    // Update our record only after Paddle confirms, so the two never drift.
+    await paddleRequest(`/subscriptions/${sub.stripeSubscriptionId}`, 'PATCH', {
+      scheduled_change: null,
+    })
 
     await prisma.subscription.update({
       where: { id: sub.id },

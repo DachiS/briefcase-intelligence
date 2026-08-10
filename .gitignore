@@ -12,3 +12,4 @@ node_modules/
 # Build artifacts / OS junk
 *.tsbuildinfo
 .DS_Store
+.env*

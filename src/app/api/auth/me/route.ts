@@ -29,7 +29,11 @@ export async function GET() {
         where: { email: session.user.email.toLowerCase() },
         include: {
           subscriptions: {
-            where: { status: 'ACTIVE' },
+            // Must match getCurrentUser's gate exactly (status AND unexpired
+            // period). A row can be ACTIVE but past its paid period — counting
+            // that as subscribed here would show a Google user as a member while
+            // the content routes (gated by getCurrentUser) still block them.
+            where: { status: 'ACTIVE', currentPeriodEnd: { gt: new Date() } },
             orderBy: { createdAt: 'desc' },
             take: 1,
           },

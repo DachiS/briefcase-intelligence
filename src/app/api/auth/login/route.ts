@@ -9,7 +9,7 @@ import { prisma } from '@/lib/prisma'
 
 import { signToken } from '@/lib/auth'
 
-import { checkRateLimit, resetRateLimit, clientIp } from '@/lib/rate-limit'
+import { checkRateLimit, peekRateLimit, resetRateLimit, clientIp } from '@/lib/rate-limit'
 
 // A fixed bcrypt hash used to burn ~the same CPU when the account doesn't exist
 // (or has no password), so response timing can't distinguish "no such email"
@@ -26,10 +26,15 @@ export async function POST(req: NextRequest) {
     }
     const normalizedEmail = email.toLowerCase()
 
-    // Throttle brute-force attempts, per IP and per targeted account.
+    // Throttle brute-force attempts. The per-IP limiter counts every attempt
+    // (an attacker's own address absorbs the cost). The per-email limiter is
+    // only PEEKED here and advanced solely on a FAILED credential check below —
+    // otherwise anyone could lock a victim out of their own account just by
+    // firing wrong-password requests at their email.
     const ip = clientIp(req)
+    const emailKey = `login:email:${normalizedEmail}`
     const byIp = checkRateLimit(`login:ip:${ip}`, 10, 10 * 60_000)
-    const byEmail = checkRateLimit(`login:email:${normalizedEmail}`, 5, 10 * 60_000)
+    const byEmail = peekRateLimit(emailKey, 5)
     if (!byIp.success || !byEmail.success) {
       const retryAfter = Math.max(byIp.retryAfter, byEmail.retryAfter)
       return NextResponse.json(
@@ -54,6 +59,8 @@ export async function POST(req: NextRequest) {
     const valid = await bcrypt.compare(password, user?.password || DUMMY_HASH)
 
     if (!user || !user.password || !valid) {
+      // Count this failure toward the per-email lockout (created on first fail).
+      checkRateLimit(emailKey, 5, 10 * 60_000)
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 

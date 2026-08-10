@@ -59,6 +59,22 @@ export function checkRateLimit(key: string, limit: number, windowMs: number): Ra
   return { success: true, remaining: limit - win.count, retryAfter: Math.ceil((win.resetAt - now) / 1000) }
 }
 
+/**
+ * Read a bucket's current state WITHOUT counting the call against the limit.
+ * Use this to gate on a counter that should only be advanced by specific events
+ * (e.g. a login limiter that must count failed attempts, not mere attempts, so
+ * an attacker can't lock out a victim by spamming the endpoint). Pair with
+ * `checkRateLimit` on the same key to record an event.
+ */
+export function peekRateLimit(key: string, limit: number): RateLimitResult {
+  const now = Date.now()
+  const win = buckets.get(key)
+  if (!win || win.resetAt <= now) return { success: true, remaining: limit, retryAfter: 0 }
+  const retryAfter = Math.ceil((win.resetAt - now) / 1000)
+  if (win.count >= limit) return { success: false, remaining: 0, retryAfter }
+  return { success: true, remaining: limit - win.count, retryAfter }
+}
+
 /** Clear a bucket, e.g. after a successful login so real users aren't locked out. */
 export function resetRateLimit(key: string): void {
   buckets.delete(key)

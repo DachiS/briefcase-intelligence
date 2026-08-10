@@ -107,7 +107,11 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
     const el = stripRef.current
     if (!el) return
     const clamped = Math.min(Math.max(0, i), Math.max(0, slides.length - 1))
-    el.scrollTo({ left: clamped * el.clientWidth, behavior: smooth ? 'smooth' : 'auto' })
+    // Honor prefers-reduced-motion: users who ask for it get an instant jump
+    // rather than an animated slide.
+    const reduce = typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    el.scrollTo({ left: clamped * el.clientWidth, behavior: smooth && !reduce ? 'smooth' : 'auto' })
   }, [slides.length])
 
   const go = useCallback((dir: number) => scrollToSlide(idxRef.current + dir), [scrollToSlide])
@@ -195,11 +199,6 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
   const atStart = idx <= 0
   const atEnd = idx >= slides.length - 1
 
-  const ctrlBtn: React.CSSProperties = {
-    background: 'none', border: '1px solid var(--border)', color: 'var(--paper-dim)',
-    cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.15em',
-    padding: '5px 10px', textTransform: 'uppercase',
-  }
   const pageFrame: React.CSSProperties = {
     boxShadow: '0 12px 48px rgba(0,0,0,0.6)', border: '1px solid var(--border)',
     background: '#fff', width: renderedW, height: renderedH, overflow: 'hidden', flex: 'none',
@@ -226,18 +225,18 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
         ...overlayBar, ...(fullscreen ? { top: 0, borderBottom: '1px solid rgba(255,255,255,0.08)' } : {}),
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <Link href="/issues" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.2em', color: 'var(--paper-dim)', textDecoration: 'none' }}>← ARCHIVE</Link>
+          <Link href="/issues" className="reader-link" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.2em', color: 'var(--paper-dim)', textDecoration: 'none' }}>← ARCHIVE</Link>
           <span style={{ width: 1, height: 16, background: 'var(--border)' }} />
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', letterSpacing: '0.24em', color: 'var(--paper)' }}>FILE №{num} · {title}</span>
         </div>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button style={ctrlBtn} onClick={() => setScale(s => Math.max(0.6, +(s - 0.15).toFixed(2)))} aria-label="Zoom out">−</button>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.55rem', color: 'var(--paper-dim)', width: 38, textAlign: 'center' }}>{Math.round(scale * 100)}%</span>
-          <button style={ctrlBtn} onClick={() => setScale(s => Math.min(2.5, +(s + 0.15).toFixed(2)))} aria-label="Zoom in">+</button>
+          <button className="reader-btn reader-btn--icon" onClick={() => setScale(s => Math.max(0.6, +(s - 0.15).toFixed(2)))} disabled={scale <= 0.6} aria-label="Zoom out">−</button>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.55rem', color: 'var(--paper-dim)', width: 38, textAlign: 'center' }} aria-live="polite">{Math.round(scale * 100)}%</span>
+          <button className="reader-btn reader-btn--icon" onClick={() => setScale(s => Math.min(2.5, +(s + 0.15).toFixed(2)))} disabled={scale >= 2.5} aria-label="Zoom in">+</button>
           <span style={{ width: 1, height: 16, background: 'var(--border)' }} />
-          {pdfUrl && <a href={`${pdfUrl}?download=1`} style={{ ...ctrlBtn, textDecoration: 'none' }}>↓ Download</a>}
-          <button style={ctrlBtn} onClick={toggleFullscreen}>⊕ {fullscreen ? 'Exit' : 'Full'}</button>
+          {pdfUrl && <a className="reader-btn" href={`${pdfUrl}?download=1`}>↓ Download</a>}
+          <button className="reader-btn" onClick={toggleFullscreen} aria-label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>⊕ {fullscreen ? 'Exit' : 'Full'}</button>
         </div>
       </div>
 
@@ -267,6 +266,8 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
               ref={stripRef}
               onScroll={onStripScroll}
               className="reader-strip"
+              role="region"
+              aria-label={`${title} — ${numPages} pages, use arrow keys to turn`}
               style={{
                 position: 'absolute', inset: 0, display: 'flex',
                 overflowX: 'auto', overflowY: 'hidden',
@@ -279,6 +280,9 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
                   <div
                     key={pages[0]}
                     ref={n => { slideRefs.current[i] = n }}
+                    role="group"
+                    aria-label={pages.length === 2 ? `Pages ${pages[0]} and ${pages[1]}` : `Page ${pages[0]}`}
+                    aria-hidden={i !== idx}
                     style={{
                       flex: 'none', width: '100%', height: '100%',
                       scrollSnapAlign: 'start', scrollSnapStop: 'always',
@@ -319,11 +323,11 @@ export default function IssuePage({ params }: { params: Promise<{ id: string }> 
           padding: '10px 24px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 20,
           ...overlayBar, ...(fullscreen ? { bottom: 0, borderTop: '1px solid rgba(255,255,255,0.08)' } : {}),
         }}>
-          <button style={{ ...ctrlBtn, opacity: atStart ? 0.4 : 1 }} disabled={atStart} onClick={() => go(-1)}>◀ Prev</button>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', letterSpacing: '0.2em', color: 'var(--paper)' }}>
+          <button className="reader-btn" disabled={atStart} onClick={() => go(-1)} aria-label="Previous page">◀ Prev</button>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', letterSpacing: '0.2em', color: 'var(--paper)' }} aria-live="polite">
             {curPages.length === 2 ? `PAGES ${curPages[0]}–${curPages[1]}` : `PAGE ${curPages[0] ?? 1}`} / {numPages}
           </span>
-          <button style={{ ...ctrlBtn, opacity: atEnd ? 0.4 : 1 }} disabled={atEnd} onClick={() => go(1)}>Next ▶</button>
+          <button className="reader-btn" disabled={atEnd} onClick={() => go(1)} aria-label="Next page">Next ▶</button>
         </div>
       )}
     </main>

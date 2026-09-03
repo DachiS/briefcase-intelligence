@@ -2,7 +2,13 @@
 
 import { PRICING } from './pricing'
 
-export const PADDLE_API_URL = 'https://api.paddle.com' // Change to https://api.paddle.com for live
+// Server-side Paddle REST base. Switches to the sandbox host when
+// NEXT_PUBLIC_PADDLE_ENV=sandbox so the cancel route (and any future API calls)
+// hit the same environment the checkout runs in. Defaults to live.
+export const PADDLE_API_URL =
+  process.env.NEXT_PUBLIC_PADDLE_ENV === 'sandbox'
+    ? 'https://sandbox-api.paddle.com'
+    : 'https://api.paddle.com'
 
 // Plan metadata for the Paddle integration. Price + Paddle price ID are sourced
 // from the single pricing source of truth (`src/lib/pricing.ts`) so amounts can
@@ -55,6 +61,12 @@ export async function paddleRequest(endpoint: string, method = 'GET', body?: obj
   return res.json()
 }
 
+// Reject events whose timestamp is older/newer than this, to stop replay of a
+// captured webhook (e.g. replaying an old `subscription.activated` to re-grant
+// access after a cancellation). Paddle recommends 5 seconds; we allow 5 minutes
+// to tolerate clock skew and delivery latency.
+const WEBHOOK_TOLERANCE_SECONDS = 5 * 60
+
 export function verifyPaddleWebhook(
   rawBody: string,
   signature: string,
@@ -70,11 +82,21 @@ export function verifyPaddleWebhook(
   const ts = tsPart.split('=')[1]
   const h1 = h1Part.split('=')[1]
 
+  // Freshness check — guards against replay of a previously valid payload.
+  const tsSeconds = Number(ts)
+  if (!Number.isFinite(tsSeconds)) return false
+  const nowSeconds = Math.floor(Date.now() / 1000)
+  if (Math.abs(nowSeconds - tsSeconds) > WEBHOOK_TOLERANCE_SECONDS) return false
+
   const signedPayload = `${ts}:${rawBody}`
   const expectedSignature = crypto
     .createHmac('sha256', secret)
     .update(signedPayload)
     .digest('hex')
 
-  return expectedSignature === h1
+  // Constant-time comparison — avoid leaking the correct HMAC via timing.
+  const expectedBuf = Buffer.from(expectedSignature, 'hex')
+  const receivedBuf = Buffer.from(h1, 'hex')
+  if (expectedBuf.length !== receivedBuf.length) return false
+  return crypto.timingSafeEqual(expectedBuf, receivedBuf)
 }

@@ -12,6 +12,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL('/login?error=invalid-token', req.url))
   }
 
+  // The verificationToken column is currently overloaded for password resets
+  // (stored as `reset_<token>_<expiry>`). Never let a password-reset token be
+  // consumed as an email verification. (See fix guide: give resets their own
+  // columns to remove this overloading entirely.)
+  if (token.startsWith('reset_')) {
+    return NextResponse.redirect(new URL('/login?error=invalid-token', req.url))
+  }
+
   const user = await prisma.user.findFirst({
     where: { verificationToken: token },
   })

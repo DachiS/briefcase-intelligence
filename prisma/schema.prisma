@@ -20,6 +20,13 @@ model User {
   subscriptions     Subscription[]
   emailVerified     Boolean        @default(false)
   verificationToken String?
+  // Password reset — token is emailed in the clear but only its SHA-256 hash is
+  // stored, so a DB leak cannot be turned into working reset links.
+  resetTokenHash    String?
+  resetTokenExpiry  DateTime?
+  // Bumped on every password reset. Embedded in issued JWTs and checked on each
+  // request so a password change invalidates all previously issued sessions.
+  tokenVersion      Int            @default(0)
 }
 
 model Subscription {

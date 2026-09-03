@@ -4,41 +4,67 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Navbar from '@/components/Navbar'
+import { FIELD_AGENT_MONTHLY, STATION_CHIEF_ANNUAL, ANNUAL_SAVINGS_PCT } from '@/lib/pricing'
+import { operativeId } from '@/lib/identity'
 
 interface User {
   id: string; name: string; email: string; role: string; hasSubscription: boolean
   subscription: { plan: string; status: string; currentPeriodEnd: string; cancelAtPeriodEnd: boolean } | null
 }
 
-function operativeId(id: string) {
-  return '0x' + id.slice(0, 3).toUpperCase() + '-' + id.slice(-3).toUpperCase()
-}
-
 function clearanceLabel(user: User) {
   if (user.role === 'ADMIN') return 'DIRECTOR'
-  return user.hasSubscription ? 'FIELD AGT' : 'ANALYST'
+  if (!user.hasSubscription) return 'ANALYST'
+  return user.subscription?.plan?.includes('ANNUAL') ? 'STN CHIEF' : 'FIELD AGT'
 }
 
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [activating, setActivating] = useState(false)
   const [canceling, setCanceling] = useState(false)
+  const [changing, setChanging] = useState(false)
+  const [resuming, setResuming] = useState(false)
   const router = useRouter()
   const { data: session, status } = useSession()
 
   useEffect(() => {
-    fetch('/api/auth/me')
-      .then(r => r.json())
-      .then(data => {
-        if (data?.user) { setUser(data.user); setLoading(false) }
-        else if (status === 'authenticated' && session?.user) {
+    let cancelled = false
+    // Set when Paddle redirects back after a successful checkout
+    // (successUrl = /dashboard?subscribed=true). The activating webhook is
+    // asynchronous, so we poll briefly until the subscription is recorded
+    // rather than immediately (and wrongly) showing the "subscribe" prompt.
+    const justSubscribed =
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('subscribed') === 'true'
+    let attempts = 0
+
+    const load = async () => {
+      try {
+        const data = await fetch('/api/auth/me').then(r => r.json())
+        if (cancelled) return
+        if (data?.user) {
+          setUser(data.user)
+          setLoading(false)
+          if (justSubscribed && !data.user.hasSubscription && attempts < 8) {
+            attempts++
+            setActivating(true)
+            setTimeout(load, 2500)
+          } else {
+            setActivating(false)
+          }
+        } else if (status === 'authenticated' && session?.user) {
           setUser({ id: (session.user as any).id || '', name: session.user.name || '', email: session.user.email || '', role: (session.user as any).role || 'SUBSCRIBER', hasSubscription: (session.user as any).hasSubscription || false, subscription: null })
           setLoading(false)
         } else if (status === 'unauthenticated') {
           router.push('/login?redirect=/dashboard')
         }
-      })
-      .catch(() => router.push('/login'))
+      } catch {
+        if (!cancelled) router.push('/login')
+      }
+    }
+    load()
+    return () => { cancelled = true }
   }, [router, session, status])
 
   const handleCancel = async () => {
@@ -47,6 +73,60 @@ export default function DashboardPage() {
     const res = await fetch('/api/paddle/cancel', { method: 'POST' })
     if (res.ok) { const data = await fetch('/api/auth/me').then(r => r.json()); setUser(data.user) }
     setCanceling(false)
+  }
+
+  const handleResume = async () => {
+    setResuming(true)
+    try {
+      const res = await fetch('/api/paddle/resume', { method: 'POST' })
+      if (res.ok) {
+        const data = await fetch('/api/auth/me').then(r => r.json()); setUser(data.user)
+      } else {
+        const err = await res.json().catch(() => ({}))
+        alert(err.error || 'Could not resume subscription. Please try again.')
+      }
+    } finally {
+      setResuming(false)
+    }
+  }
+
+  const handleChangePlan = async (plan: 'monthly' | 'annual') => {
+    setChanging(true)
+    try {
+      // Show the exact amount Paddle will charge now (nets any account credit).
+      let chargeLine = 'You’ll be charged the prorated difference now. '
+      try {
+        const pv = await fetch('/api/paddle/change-plan/preview', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan }),
+        }).then(r => r.json())
+        if (typeof pv.amountMinor === 'number') {
+          const amt = pv.amountMinor / 100
+          chargeLine = amt > 0
+            ? `You’ll be charged ${pv.currency} ${amt.toFixed(2)} now (prorated). `
+            : 'No charge now — it’s covered by your account credit. '
+        }
+      } catch { /* fall back to the generic line */ }
+
+      const forward = plan === 'annual' ? `${STATION_CHIEF_ANNUAL}/year` : `${FIELD_AGENT_MONTHLY}/month`
+      const title = plan === 'annual' ? 'Upgrade to the annual plan?' : 'Switch to the monthly plan?'
+      if (!confirm(`${title}\n\n${chargeLine}You’ll then be billed ${forward} going forward.`)) {
+        return
+      }
+
+      const res = await fetch('/api/paddle/change-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan }),
+      })
+      if (res.ok) {
+        const data = await fetch('/api/auth/me').then(r => r.json()); setUser(data.user)
+      } else {
+        const err = await res.json().catch(() => ({}))
+        alert(err.error || 'Could not change plan. Please try again.')
+      }
+    } finally {
+      setChanging(false)
+    }
   }
 
   if (loading) {
@@ -66,7 +146,7 @@ export default function DashboardPage() {
   const callSign = user.name.split(' ')[0].toUpperCase()
   const opId = operativeId(user.id)
   const clearance = clearanceLabel(user)
-  const clearanceLevel = user.role === 'ADMIN' ? 4 : user.hasSubscription ? 2 : 1
+  const clearanceLevel = user.role === 'ADMIN' ? 4 : user.hasSubscription ? (user.subscription?.plan?.includes('ANNUAL') ? 3 : 2) : 1
 
   return (
     <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -115,7 +195,7 @@ export default function DashboardPage() {
                   ))}
                 </div>
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.55rem', color: 'var(--paper-dim)', letterSpacing: '0.18em' }}>
-                  {clearance} · {user.hasSubscription ? 'SUBSCRIBE TO UPGRADE →' : 'ACTIVE'}
+                  {clearance} · {user.hasSubscription ? 'ACTIVE' : 'SUBSCRIBE TO UPGRADE →'}
                 </div>
               </div>
 
@@ -136,8 +216,7 @@ export default function DashboardPage() {
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.55rem', letterSpacing: '0.28em', color: 'var(--paper-dim)', marginBottom: 14 }}>QUICK ACTIONS</div>
               {([
                 user.hasSubscription ? ['→', 'Browse current issues', '/issues'] : null,
-                !user.hasSubscription ? ['◆', 'Upgrade clearance', '/clearance'] : null,
-                ['→', 'Subscribe / manage plan', '/clearance'],
+                !user.hasSubscription ? ['◆', 'Subscribe / choose plan', '/clearance'] : null,
               ].filter((x): x is string[] => x !== null)).map(([k, l, href], i, arr) => (
                 <Link key={l} href={href} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 0', borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none', textDecoration: 'none', color: 'inherit' }}>
                   <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--red)', fontSize: '0.85rem', width: 16 }}>{k}</span>
@@ -174,7 +253,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Subscription card */}
-            <div className="card-base tab-folder" style={{ padding: 24, marginTop: 28 }}>
+            <div id="subscription-card" className="card-base tab-folder" style={{ padding: 24, marginTop: 28, scrollMarginTop: 80 }}>
               <div className="tab">SUBSCRIPTION</div>
 
               {sub ? (
@@ -192,7 +271,7 @@ export default function DashboardPage() {
                   {[
                     ['Plan', sub.plan.toLowerCase()],
                     ['Status', sub.status],
-                    ['Renews', new Date(sub.currentPeriodEnd).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })],
+                    [sub.cancelAtPeriodEnd ? 'Access ends' : 'Renews', new Date(sub.currentPeriodEnd).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })],
                   ].map(([k, v]) => (
                     <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 0', borderBottom: '1px solid var(--border)' }}>
                       <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--paper-dim)', letterSpacing: '0.24em', textTransform: 'uppercase' }}>{k}</span>
@@ -201,10 +280,27 @@ export default function DashboardPage() {
                   ))}
 
                   {sub.cancelAtPeriodEnd && (
-                    <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.55rem', color: 'var(--red)', opacity: 0.7, marginTop: 10, letterSpacing: '0.1em' }}>Cancels at period end. Access retained until renewal date.</p>
+                    <>
+                      <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.55rem', color: 'var(--red)', opacity: 0.7, marginTop: 10, letterSpacing: '0.1em' }}>Cancels at period end. Access retained until renewal date.</p>
+                      <button onClick={handleResume} disabled={resuming} className="btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 16 }}>
+                        {resuming ? 'PROCESSING…' : '↻ Resume subscription'}
+                      </button>
+                    </>
                   )}
 
-                  <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+                  {/* Upgrade to annual — only for an active (non-canceling) monthly plan */}
+                  {!sub.cancelAtPeriodEnd && !sub.plan.includes('ANNUAL') && (
+                    <button onClick={() => handleChangePlan('annual')} disabled={changing} className="btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 20 }}>
+                      {changing ? 'PROCESSING…' : `⬆ Upgrade to Annual — save ${ANNUAL_SAVINGS_PCT}%`}
+                    </button>
+                  )}
+
+                  <div style={{ display: 'flex', gap: 20, marginTop: 18, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {!sub.cancelAtPeriodEnd && sub.plan.includes('ANNUAL') && (
+                      <button onClick={() => handleChangePlan('monthly')} disabled={changing} style={{ background: 'none', border: 'none', fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--paper-dim)', cursor: 'pointer', letterSpacing: '0.15em', padding: 0, textTransform: 'uppercase' }}>
+                        {changing ? 'Processing...' : '↓ Switch to monthly'}
+                      </button>
+                    )}
                     {!sub.cancelAtPeriodEnd && (
                       <button onClick={handleCancel} disabled={canceling} style={{ background: 'none', border: 'none', fontFamily: 'var(--font-mono)', fontSize: '0.6rem', color: 'var(--paper-dim)', cursor: 'pointer', letterSpacing: '0.15em', padding: 0, textTransform: 'uppercase' }}>
                         {canceling ? 'Processing...' : '× Cancel subscription'}
@@ -212,6 +308,11 @@ export default function DashboardPage() {
                     )}
                   </div>
                 </>
+              ) : activating ? (
+                <div style={{ paddingTop: 8 }}>
+                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--gold)', letterSpacing: '0.18em', marginBottom: 10 }}>● ACTIVATING CLEARANCE…</p>
+                  <p style={{ fontFamily: 'var(--font-body)', color: 'var(--paper-dim)', fontSize: '0.9rem', lineHeight: 1.6 }}>Payment received. Confirming your subscription — this usually takes a few seconds.</p>
+                </div>
               ) : (
                 <div style={{ paddingTop: 8 }}>
                   <p style={{ fontFamily: 'var(--font-body)', color: 'var(--paper-dim)', marginBottom: 20, fontSize: '0.9rem', lineHeight: 1.6 }}>No active subscription. Subscribe to access all declassified issues.</p>

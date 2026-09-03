@@ -1,17 +1,23 @@
 export const dynamic = 'force-dynamic'
 // src/app/api/paddle/webhook/route.ts
 //
-// Paddle (Merchant of Record) webhook. Activates a subscription record when a
-// purchase completes. Signature is verified with the Paddle webhook secret.
+// Paddle (Merchant of Record) webhook. Keeps the local Subscription record in
+// sync with the full Paddle lifecycle:
+//   • activation  — subscription.created / activated, transaction.completed
+//   • changes     — subscription.updated (status + scheduled cancel + period)
+//   • loss/cancel — subscription.canceled, subscription.past_due, paused
+// Signature is verified with the Paddle webhook secret.
 //
 // NOTE: requires PADDLE_WEBHOOK_SECRET to be set and the webhook destination to
 // be registered in the Paddle dashboard. Needs end-to-end testing against a
 // live/sandbox Paddle account before going to production.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyPaddleWebhook } from '@/lib/paddle'
+import { verifyPaddleWebhook, PLANS, paddleRequest } from '@/lib/paddle'
 import { PRICING } from '@/lib/pricing'
+import { sendWelcomeEmail } from '@/lib/email'
 import { prisma } from '@/lib/prisma'
+import type { Prisma, SubscriptionStatus } from '@prisma/client'
 
 // Map a Paddle price ID back to one of our plan keys.
 function planFromPriceId(priceId?: string): 'monthly' | 'annual' | null {
@@ -20,6 +26,214 @@ function planFromPriceId(priceId?: string): 'monthly' | 'annual' | null {
   if (priceId === PRICING.stationChief.paddlePriceId) return 'annual'
   return null
 }
+
+// Map a Paddle subscription status string to our enum. Anything that revokes
+// access (paused, canceled, past_due) maps to a non-ACTIVE state so the access
+// gate (which also checks currentPeriodEnd) stops granting entry.
+function statusFromPaddle(s?: string): SubscriptionStatus {
+  switch (s) {
+    case 'active':
+      return 'ACTIVE'
+    case 'trialing':
+      return 'TRIALING'
+    case 'past_due':
+      return 'PAST_DUE'
+    case 'paused':
+      return 'PAST_DUE'
+    case 'canceled':
+      return 'CANCELED'
+    default:
+      return 'INCOMPLETE'
+  }
+}
+
+// Resolve the Subscription record this event refers to: first by the Paddle
+// subscription id we stored, then by the user (custom_data / customer email).
+async function resolveSubscriptionRecord(data: any) {
+  const subId: string | undefined = data.id || data.subscription_id
+  if (subId) {
+    const bySubId = await prisma.subscription.findFirst({
+      where: { stripeSubscriptionId: subId },
+    })
+    if (bySubId) return bySubId
+  }
+
+  const user = await resolveUser(data)
+  if (user) {
+    return prisma.subscription.findFirst({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'desc' },
+    })
+  }
+  return null
+}
+
+type ResolvedUser = { id: string; email: string; name: string }
+
+// Resolve the owning user for an event. One DB query; the result is reused by
+// callers (activation reuses it for the welcome email) to avoid re-querying.
+//
+// SECURITY (#4): custom_data is set in the browser (subscribe/page.tsx) and is
+// fully attacker-controlled — a tampered checkout could point custom.email at
+// someone else's account. So we resolve the owner from Paddle's OWN verified
+// customer record: look up the customer_id (which the buyer cannot forge) via
+// the API to get the authoritative email. Only if that lookup is unavailable do
+// we fall back to the event's inline customer email, then to custom_data.
+async function resolveUser(data: any): Promise<ResolvedUser | null> {
+  const custom = data.custom_data || {}
+
+  let verifiedEmail: string | undefined
+  const customerId: string | undefined = data.customer_id || data.customer?.id
+  if (customerId) {
+    try {
+      const res = await paddleRequest(`/customers/${customerId}`, 'GET')
+      verifiedEmail = res?.data?.email
+    } catch (e) {
+      // Non-fatal: fall back to the event's email fields below.
+      console.error('Paddle customer lookup failed; falling back to event email', e)
+    }
+  }
+
+  // Try each candidate email in trust order and return the FIRST that maps to a
+  // real user. The Paddle-verified email is preferred (unforgeable), but if the
+  // buyer's Paddle customer record holds a different address than their account
+  // (they edited it at checkout, or reused an existing Paddle customer), that
+  // lookup finds nobody — so we must still fall back to the event's inline email
+  // and custom_data.email rather than dropping a paid subscription on the floor.
+  const candidates = [verifiedEmail, data.customer?.email, custom.email]
+    .filter((e): e is string => !!e)
+    .map(e => e.toLowerCase())
+  for (const email of [...new Set(candidates)]) {
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, email: true, name: true },
+    })
+    if (user) return user
+  }
+  return null
+}
+
+// Activation: create or update the record to ACTIVE for the purchased plan.
+async function handleActivation(data: any) {
+  const custom = data.custom_data || {}
+
+  const priceId: string | undefined =
+    data.items?.[0]?.price?.id || data.items?.[0]?.price_id || data.details?.line_items?.[0]?.price_id
+  // SECURITY: derive the plan from the Paddle-verified price ID, NEVER from
+  // custom_data. custom_data is set in the browser (subscribe/page.tsx) and is
+  // fully attacker-controlled — trusting custom.plan would let a buyer of the
+  // monthly plan self-upgrade to annual access. Only fall back to custom.plan
+  // when the price ID is unrecognised (e.g. a new/unmapped Paddle product).
+  const plan: 'monthly' | 'annual' =
+    planFromPriceId(priceId) ||
+    (custom.plan === 'annual' || custom.plan === 'monthly' ? custom.plan : 'monthly')
+
+  const owner = await resolveUser(data)
+  if (!owner) {
+    console.error('Paddle webhook: could not resolve user from event', { custom })
+    return
+  }
+  const userId = owner.id
+
+  // Prefer the subscription id (sub_…). On transaction.completed, data.id is a
+  // txn_… id while data.subscription_id holds the sub id we need for cancels.
+  const paddleSubId: string = data.subscription_id || data.id || `paddle_${Date.now()}`
+  const startsAt = data.current_billing_period?.starts_at
+    ? new Date(data.current_billing_period.starts_at)
+    : new Date()
+  let endsAt: Date
+  if (data.current_billing_period?.ends_at) {
+    endsAt = new Date(data.current_billing_period.ends_at)
+  } else {
+    endsAt = new Date(startsAt)
+    if (plan === 'annual') endsAt.setFullYear(endsAt.getFullYear() + 1)
+    else endsAt.setMonth(endsAt.getMonth() + 1)
+  }
+
+  const existing = await prisma.subscription.findFirst({ where: { userId } })
+
+  const fields = {
+    stripeSubscriptionId: paddleSubId,
+    stripePriceId: priceId || plan,
+    plan: plan === 'annual' ? ('ANNUAL' as const) : ('MONTHLY' as const),
+    status: 'ACTIVE' as const,
+    cancelAtPeriodEnd: false,
+    currentPeriodStart: startsAt,
+    currentPeriodEnd: endsAt,
+  }
+
+  if (existing) {
+    await prisma.subscription.update({ where: { id: existing.id }, data: fields })
+  } else {
+    await prisma.subscription.create({ data: { userId, ...fields } })
+  }
+
+  // Send the welcome email only on a genuine activation (no prior record, or a
+  // record that was not already ACTIVE) so repeated activation events for the
+  // same subscription — Paddle sends both subscription.created and
+  // transaction.completed — don't email the customer twice.
+  if (!existing || existing.status !== 'ACTIVE') {
+    try {
+      // Reuse the already-resolved owner record — no extra query.
+      await sendWelcomeEmail(owner.email, owner.name, PLANS[plan].name)
+    } catch (e) {
+      // Never fail the webhook because the welcome email bounced.
+      console.error('Welcome email failed (non-fatal):', e)
+    }
+  }
+
+  console.log(`Paddle subscription activated for user ${userId}, plan: ${plan}`)
+}
+
+// Lifecycle change: update status / scheduled-cancel / period on an existing
+// record. Does not create records — only an activation event should do that.
+async function handleLifecycle(type: string, data: any) {
+  const record = await resolveSubscriptionRecord(data)
+  if (!record) {
+    console.error(`Paddle webhook: no local record for ${type}`, { id: data.id })
+    return
+  }
+
+  const update: Prisma.SubscriptionUpdateInput = {}
+
+  if (type === 'subscription.canceled') {
+    update.status = 'CANCELED'
+  } else if (type === 'subscription.past_due') {
+    update.status = 'PAST_DUE'
+  } else if (type === 'subscription.paused') {
+    update.status = 'PAST_DUE'
+  } else if (type === 'subscription.updated') {
+    if (data.status) update.status = statusFromPaddle(data.status)
+    // Paddle signals a pending end-of-term cancel via scheduled_change.
+    update.cancelAtPeriodEnd = data.scheduled_change?.action === 'cancel'
+    // Sync the plan when the subscription's price changed (e.g. a plan switch),
+    // so the local record doesn't keep the old plan/price after an upgrade.
+    const priceId: string | undefined = data.items?.[0]?.price?.id || data.items?.[0]?.price_id
+    const planKey = planFromPriceId(priceId)
+    if (planKey) {
+      update.plan = planKey === 'annual' ? 'ANNUAL' : 'MONTHLY'
+      update.stripePriceId = priceId
+    }
+  }
+
+  if (data.current_billing_period?.starts_at) {
+    update.currentPeriodStart = new Date(data.current_billing_period.starts_at)
+  }
+  if (data.current_billing_period?.ends_at) {
+    update.currentPeriodEnd = new Date(data.current_billing_period.ends_at)
+  }
+
+  await prisma.subscription.update({ where: { id: record.id }, data: update })
+  console.log(`Paddle ${type} applied to subscription ${record.id}`)
+}
+
+const ACTIVATION_EVENTS = ['subscription.created', 'subscription.activated', 'transaction.completed']
+const LIFECYCLE_EVENTS = [
+  'subscription.updated',
+  'subscription.canceled',
+  'subscription.past_due',
+  'subscription.paused',
+]
 
 export async function POST(req: NextRequest) {
   try {
@@ -36,81 +250,21 @@ export async function POST(req: NextRequest) {
     const type: string = event.event_type || ''
     const data = event.data || {}
 
-    // Only activate on subscription/transaction completion events.
-    if (!['subscription.created', 'subscription.activated', 'transaction.completed'].includes(type)) {
-      return new NextResponse('OK')
+    if (ACTIVATION_EVENTS.includes(type)) {
+      await handleActivation(data)
+    } else if (LIFECYCLE_EVENTS.includes(type)) {
+      await handleLifecycle(type, data)
     }
 
-    const custom = data.custom_data || {}
-
-    // Resolve the plan: prefer custom_data, fall back to the purchased price ID.
-    const priceId: string | undefined =
-      data.items?.[0]?.price?.id || data.items?.[0]?.price_id || data.details?.line_items?.[0]?.price_id
-    const plan: 'monthly' | 'annual' =
-      custom.plan === 'annual' || custom.plan === 'monthly'
-        ? custom.plan
-        : planFromPriceId(priceId) || 'monthly'
-
-    // Resolve the user by id, then by the account email passed in custom_data.
-    let userId: string | undefined = custom.userId
-    if (!userId) {
-      const email: string | undefined = custom.email || data.customer?.email
-      if (email) {
-        const u = await prisma.user.findUnique({ where: { email: String(email).toLowerCase() } })
-        userId = u?.id
-      }
-    }
-    if (!userId) {
-      console.error('Paddle webhook: could not resolve user from event', { custom })
-      return new NextResponse('OK')
-    }
-
-    // Subscription id + billing period.
-    const paddleSubId: string = data.id || data.subscription_id || `paddle_${Date.now()}`
-    const startsAt = data.current_billing_period?.starts_at
-      ? new Date(data.current_billing_period.starts_at)
-      : new Date()
-    let endsAt: Date
-    if (data.current_billing_period?.ends_at) {
-      endsAt = new Date(data.current_billing_period.ends_at)
-    } else {
-      endsAt = new Date(startsAt)
-      if (plan === 'annual') endsAt.setFullYear(endsAt.getFullYear() + 1)
-      else endsAt.setMonth(endsAt.getMonth() + 1)
-    }
-
-    const existing = await prisma.subscription.findFirst({ where: { userId } })
-
-    if (existing) {
-      await prisma.subscription.update({
-        where: { id: existing.id },
-        data: {
-          stripeSubscriptionId: paddleSubId,
-          stripePriceId: priceId || plan,
-          plan: plan === 'annual' ? 'ANNUAL' : 'MONTHLY',
-          status: 'ACTIVE',
-          currentPeriodStart: startsAt,
-          currentPeriodEnd: endsAt,
-        },
-      })
-    } else {
-      await prisma.subscription.create({
-        data: {
-          userId,
-          stripeSubscriptionId: paddleSubId,
-          stripePriceId: priceId || plan,
-          plan: plan === 'annual' ? 'ANNUAL' : 'MONTHLY',
-          status: 'ACTIVE',
-          currentPeriodStart: startsAt,
-          currentPeriodEnd: endsAt,
-        },
-      })
-    }
-
-    console.log(`Paddle subscription activated for user ${userId}, plan: ${plan}`)
+    // 200 for events we handled or intentionally ignore. Signature was already
+    // verified above, so reaching here means the payload was authentic.
     return new NextResponse('OK')
   } catch (error) {
+    // A verified event that we FAILED to process (e.g. a transient DB outage
+    // during activation) must return a non-2xx so Paddle retries — otherwise a
+    // paid subscription is silently lost. Signature failures return 403 earlier
+    // and never reach this catch.
     console.error('Paddle webhook error:', error)
-    return new NextResponse('OK')
+    return new NextResponse('ERROR', { status: 500 })
   }
 }

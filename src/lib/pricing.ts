@@ -34,14 +34,19 @@ export const PRICING = {
     amount: 9.99,
     interval: 'month',
     currency: 'USD',
-    paddlePriceId: 'pri_01kj2yh67dkt5vntse04hpjkav',
+    // Per-environment override (sandbox vs live) via env; the literal is the
+    // live default. Must be NEXT_PUBLIC_ so it's available in the browser
+    // checkout AND server-side webhook plan mapping.
+    paddlePriceId:
+      process.env.NEXT_PUBLIC_PADDLE_PRICE_MONTHLY || 'pri_01kj2yh67dkt5vntse04hpjkav',
   },
   stationChief: {
     name: 'Station Chief',
     amount: 89.99,
     interval: 'year',
     currency: 'USD',
-    paddlePriceId: 'pri_01kj2yjnpb7yypb6rkx85zfz8a',
+    paddlePriceId:
+      process.env.NEXT_PUBLIC_PADDLE_PRICE_ANNUAL || 'pri_01kj2yjnpb7yypb6rkx85zfz8a',
   },
 } as const satisfies Record<string, PricingTier>
 
@@ -54,3 +59,12 @@ export const amountStr = (a: number) => (a === 0 ? '0' : a.toFixed(2))
 // Pre-formatted convenience strings used in legal/marketing copy.
 export const FIELD_AGENT_MONTHLY = fmt(PRICING.fieldAgent.amount) // "$9.99"
 export const STATION_CHIEF_ANNUAL = fmt(PRICING.stationChief.amount) // "$89.99"
+
+/**
+ * Whole-number % saved by paying annually vs. 12× the monthly price. Derived
+ * from the amounts above so marketing copy ("save N%") never drifts from the
+ * real prices — never hardcode this figure. Currently ~25% (119.88 → 89.99).
+ */
+export const ANNUAL_SAVINGS_PCT = Math.round(
+  (1 - PRICING.stationChief.amount / (PRICING.fieldAgent.amount * 12)) * 100
+)

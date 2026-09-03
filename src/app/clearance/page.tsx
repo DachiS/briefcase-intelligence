@@ -104,6 +104,15 @@ export default function ClearancePage() {
   const [stage, setStage] = useState<Stage>('intro')
   const [failReason, setFailReason] = useState('')
 
+  // Existing subscribers shouldn't be funnelled back through the clearance
+  // assessment / subscribe flow — send them to their dashboard.
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(r => r.json())
+      .then(d => { if (d?.user?.hasSubscription) router.replace('/dashboard') })
+      .catch(() => {})
+  }, [router])
+
   // Cards state
   const [deck, setDeck] = useState<CardItem[]>([])
   const [selected, setSelected] = useState<number[]>([])

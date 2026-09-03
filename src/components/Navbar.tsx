@@ -2,10 +2,11 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useSession, signOut } from 'next-auth/react'
+import { signOut } from 'next-auth/react'
 
 interface User {
   id: string; name: string; email: string; role: string; hasSubscription: boolean
+  subscription?: { plan?: string } | null
 }
 
 function useUtcTime() {
@@ -35,39 +36,50 @@ export default function Navbar() {
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const router = useRouter()
-  const { data: session, status } = useSession()
   const utcTime = useUtcTime()
 
+  // /api/auth/me is authoritative for BOTH auth methods (it checks the JWT
+  // cookie and falls back to the NextAuth session server-side), so it's the
+  // single source of truth. We keep `loading` true until it resolves — never
+  // flipping to the logged-out nav prematurely — and cache the result so
+  // client-side navigations render the correct nav instantly instead of
+  // flashing "Subscribe" before the fetch returns.
   useEffect(() => {
+    let cancelled = false
+    try {
+      const cached = sessionStorage.getItem('bc_user')
+      if (cached) { setUser(JSON.parse(cached)); setLoading(false) }
+    } catch {}
+
     fetch('/api/auth/me')
       .then(r => r.json())
       .then(d => {
-        if (d.user) { setUser(d.user); setLoading(false) }
-        else if (status === 'authenticated' && session?.user) {
-          setUser({ id: (session.user as any).id || '', name: session.user.name || '', email: session.user.email || '', role: (session.user as any).role || 'SUBSCRIBER', hasSubscription: (session.user as any).hasSubscription || false })
-          setLoading(false)
-        } else if (status !== 'loading') setLoading(false)
+        if (cancelled) return
+        setUser(d.user || null)
+        try {
+          if (d.user) sessionStorage.setItem('bc_user', JSON.stringify(d.user))
+          else sessionStorage.removeItem('bc_user')
+        } catch {}
       })
-      .catch(() => setLoading(false))
-  }, [session, status])
+      .catch(() => { if (!cancelled) setUser(null) })
+      .finally(() => { if (!cancelled) setLoading(false) })
 
-  useEffect(() => {
-    if (status === 'loading') return
-    if (status === 'authenticated' && session?.user && !user) {
-      setUser({ id: (session.user as any).id || '', name: session.user.name || '', email: session.user.email || '', role: (session.user as any).role || 'SUBSCRIBER', hasSubscription: (session.user as any).hasSubscription || false })
-      setLoading(false)
-    }
-    if (status === 'unauthenticated' && !user) setLoading(false)
-  }, [status, session])
+    return () => { cancelled = true }
+  }, [])
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
     await signOut({ redirect: false })
+    try { sessionStorage.removeItem('bc_user') } catch {}
     setUser(null); setMenuOpen(false)
     router.push('/'); router.refresh()
   }
 
-  const clearance = user?.role === 'ADMIN' ? 'DIRECTOR' : user?.hasSubscription ? 'FIELD AGT' : 'CIVILIAN'
+  const clearance = user?.role === 'ADMIN'
+    ? 'DIRECTOR'
+    : user?.hasSubscription
+      ? (user.subscription?.plan?.includes('ANNUAL') ? 'STN CHIEF' : 'FIELD AGT')
+      : 'CIVILIAN'
 
   return (
     <header>

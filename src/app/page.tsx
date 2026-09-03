@@ -3,6 +3,7 @@ import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import SpyGlobe from '@/components/SpyGlobe'
 import TierCta, { type CtaTier } from '@/components/TierCta'
+import FooterLinks from '@/components/FooterLinks'
 import { PRICING, fmt, amountStr } from '@/lib/pricing'
 
 const articles = [
@@ -235,10 +236,7 @@ export default function HomePage() {
               © {new Date().getFullYear()} · ALL CONTENT CLASSIFIED
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '24px' }}>
-            <Link href="/login" className="nav-link">Login</Link>
-            <Link href="/clearance" className="nav-link">Subscribe</Link>
-          </div>
+          <FooterLinks />
         </div>
       </footer>
 

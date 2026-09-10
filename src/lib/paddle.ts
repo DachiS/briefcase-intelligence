@@ -43,11 +43,27 @@ export const PLANS = {
   },
 }
 
+// Paddle answers `authentication_malformed` if the Authorization header carries
+// anything but the bare key, and a value pasted into the Vercel CLI or dashboard
+// easily picks up wrapping quotes, a stray `Bearer ` prefix, or a trailing
+// newline. Normalise here so a copy/paste slip can't take out every subscription
+// management route, and fail loudly when the key is missing entirely rather than
+// sending the string "undefined".
+function paddleApiKey(): string {
+  const key = (process.env.PADDLE_API_KEY || '')
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .replace(/^Bearer\s+/i, '')
+    .trim()
+  if (!key) throw new Error('PADDLE_API_KEY is not set')
+  return key
+}
+
 export async function paddleRequest(endpoint: string, method = 'GET', body?: object) {
   const res = await fetch(`${PADDLE_API_URL}${endpoint}`, {
     method,
     headers: {
-      'Authorization': `Bearer ${process.env.PADDLE_API_KEY}`,
+      'Authorization': `Bearer ${paddleApiKey()}`,
       'Content-Type': 'application/json',
     },
     ...(body ? { body: JSON.stringify(body) } : {}),

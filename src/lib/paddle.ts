@@ -56,14 +56,33 @@ function paddleApiKey(): string {
     .replace(/^Bearer\s+/i, '')
     .trim()
   if (!key) throw new Error('PADDLE_API_KEY is not set')
+
+  // Paddle only reports `authentication_malformed`, and Vercel won't show a
+  // sensitive value back, so say what's wrong here — without echoing the key.
+  const sandbox = process.env.NEXT_PUBLIC_PADDLE_ENV === 'sandbox'
+  const expected = sandbox ? 'pdl_sdbx_apikey_' : 'pdl_live_apikey_'
+  if (!key.startsWith(expected) || !/^[A-Za-z0-9_]+$/.test(key)) {
+    const kind =
+      key.startsWith('pdl_sdbx_apikey_') ? 'a sandbox API key' :
+      key.startsWith('pdl_live_apikey_') ? 'a live API key' :
+      /^(test|live)_/.test(key) ? 'a client-side token (belongs in NEXT_PUBLIC_PADDLE_CLIENT_TOKEN)' :
+      key.startsWith('pdl_ntfset_') ? 'a webhook secret (belongs in PADDLE_WEBHOOK_SECRET)' :
+      'not a Paddle API key'
+    const badChars = key.replace(/[A-Za-z0-9_]/g, '').length
+    throw new Error(
+      `PADDLE_API_KEY misconfigured: NEXT_PUBLIC_PADDLE_ENV expects a key starting "${expected}", ` +
+      `but the stored value is ${kind} (length ${key.length}, ${badChars} unexpected character(s))`
+    )
+  }
   return key
 }
 
 export async function paddleRequest(endpoint: string, method = 'GET', body?: object) {
+  const key = paddleApiKey()
   const res = await fetch(`${PADDLE_API_URL}${endpoint}`, {
     method,
     headers: {
-      'Authorization': `Bearer ${paddleApiKey()}`,
+      'Authorization': `Bearer ${key}`,
       'Content-Type': 'application/json',
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
@@ -71,6 +90,11 @@ export async function paddleRequest(endpoint: string, method = 'GET', body?: obj
 
   if (!res.ok) {
     const error = await res.json()
+    // Auth failures are otherwise undiagnosable (Vercel won't reveal a
+    // sensitive key), so add its length and the host — never the key itself.
+    if (String(error?.error?.code).startsWith('authentication_')) {
+      error.diagnostic = { host: PADDLE_API_URL, keyLength: key.length }
+    }
     throw new Error(JSON.stringify(error))
   }
 
